@@ -1,0 +1,7 @@
+# .gitignore
+venv/
+__pycache__/
+.next/
+node_modules/
+.env
+*.db
