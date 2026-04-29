@@ -118,3 +118,13 @@ export const updateOrder = async (id: number, data: any) => {
   const response = await api.put(`/orders/${id}`, data);
   return response.data;
 };
+
+export const getCustomers = async () => {
+  const response = await api.get('/customers/');
+  return response.data;
+};
+
+export const createCustomer = async (data: any) => {
+  const response = await api.post('/customers/', data);
+  return response.data;
+};

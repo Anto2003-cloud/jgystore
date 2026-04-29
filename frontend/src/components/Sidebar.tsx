@@ -2,9 +2,16 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-// Añadimos ClipboardList para el icono de Encargos
-import { LayoutDashboard, Package, ShoppingCart, LogOut, Wallet, ClipboardList } from 'lucide-react';
-// Ruta relativa ajustada para evitar errores en VS Code
+// Importamos Users para el módulo CRM de Clientes
+import { 
+  LayoutDashboard, 
+  Package, 
+  ShoppingCart, 
+  LogOut, 
+  Wallet, 
+  ClipboardList, 
+  Users 
+} from 'lucide-react';
 import { useCurrencyStore } from '../store/useCurrencyStore';
 
 const menuItems = [
@@ -12,7 +19,8 @@ const menuItems = [
   { name: 'Inventario', icon: <Package size={20}/>, path: '/inventory' },
   { name: 'Punto de Venta', icon: <ShoppingCart size={20}/>, path: '/sales' },
   { name: 'Finanzas', icon: <Wallet size={20}/>, path: '/finance' },
-  { name: 'Encargos', icon: <ClipboardList size={20}/>, path: '/orders' }, // <-- NUEVO ENLACE
+  { name: 'Encargos', icon: <ClipboardList size={20}/>, path: '/orders' },
+  { name: 'Clientes', icon: <Users size={20}/>, path: '/customers' }, // <-- NUEVO MÓDULO CRM
 ];
 
 export const Sidebar = () => {
@@ -21,7 +29,6 @@ export const Sidebar = () => {
   const { rate } = useCurrencyStore(); 
 
   const handleLogout = () => {
-    // Borramos la cookie de autenticación
     document.cookie = "auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     router.push('/login');
     router.refresh();
@@ -45,8 +52,8 @@ export const Sidebar = () => {
         </span>
       </div>
 
-      {/* Navegación */}
-      <nav className="flex-1 p-4 space-y-2 mt-4 overflow-y-auto">
+      {/* Navegación - Con scroll si hay muchos items */}
+      <nav className="flex-1 p-4 space-y-2 mt-4 overflow-y-auto custom-scrollbar">
         {menuItems.map((item) => {
           const isActive = pathname === item.path;
           return (
@@ -66,10 +73,9 @@ export const Sidebar = () => {
         })}
       </nav>
 
-      {/* Footer: Tasas (Dólar/Euro) y Logout */}
+      {/* Footer: Tasas y Logout */}
       <div className="p-6 border-t border-slate-800 bg-slate-900/50 space-y-3">
         
-        {/* BLOQUE DÓLAR */}
         <div className="flex justify-between items-center text-[10px]">
           <span className="text-slate-400 uppercase font-bold tracking-wider text-[9px]">BCV USD</span>
           <span className="text-emerald-500 font-mono font-bold text-sm">
@@ -77,11 +83,9 @@ export const Sidebar = () => {
           </span>
         </div>
 
-        {/* BLOQUE EURO */}
         <div className="flex justify-between items-center text-[10px] pb-3">
           <span className="text-slate-400 uppercase font-bold tracking-wider text-[9px]">BCV EUR</span>
           <span className="text-blue-400 font-mono font-bold text-sm">
-            {/* Cálculo basado en la relación actual EUR/USD aproximada */}
             {rate > 1 ? `${(rate * 1.08).toFixed(2)} Bs.` : "---"}
           </span>
         </div>
