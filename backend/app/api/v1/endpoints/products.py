@@ -23,10 +23,11 @@ def get_db():
 
 @router.post("/", response_model=ProductRead)
 def create_new_product(product_in: ProductCreate, db: Session = Depends(get_db)):
-    # 1. Crear el producto en la DB
-    new_product = crud_product.create_product(db, product_in)
-    
-    db.refresh(new_product)
+    try:
+        return crud_product.create_product(db, product_in)
+    except Exception as e:
+        # Esto hará que el error ya no sea "desconocido"
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
     
     # 2. Obtener la tasa de forma segura
     current_rate_obj = CurrencyService.get_latest_rate(db)

@@ -99,18 +99,14 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
     onRefresh();
     onClose();
     alert("¡Producto guardado exitosamente!");
-  } catch (error: any) {
-    // ESTA LÓGICA MUESTRA EL ERROR REAL DEL BACKEND
-    const serverError = error.response?.data?.detail;
-    console.error("Error completo del servidor:", serverError);
-    
-    // Si el error es una lista (Pydantic), mostramos el primer mensaje
-    const message = Array.isArray(serverError) 
-      ? serverError[0].msg 
-      : (typeof serverError === 'string' ? serverError : "Error desconocido");
-
-    alert("Error del servidor: " + message);
-  }
+  // Dentro del catch de handleSubmit en ProductModal.tsx
+} catch (error: any) {
+  const serverMsg = error.response?.data?.detail || "Sin respuesta del servidor";
+  const finalMsg = typeof serverMsg === 'object' ? JSON.stringify(serverMsg) : serverMsg;
+  
+  console.error("ERROR CRÍTICO:", error.response);
+  alert("EL SERVIDOR DIJO: " + finalMsg);
+}
 };
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-slate-900">
