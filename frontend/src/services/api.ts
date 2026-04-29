@@ -10,12 +10,11 @@ const getCookie = (name: string) => {
 
 // --- 2. CONFIGURACIÓN DE LA INSTANCIA ---
 const api = axios.create({
-  // Asegúrate de que en tu .env.local diga: NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000', 
+  // En producción (Render), usará la variable de entorno NEXT_PUBLIC_API_URL
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1', 
 });
 
 // --- 3. EL INTERCEPTOR (EL PASAPORTE) ---
-// Este código añade el token de seguridad a cada petición automáticamente
 api.interceptors.request.use((config) => {
   const token = getCookie('auth_token');
   if (token) {
@@ -26,9 +25,8 @@ api.interceptors.request.use((config) => {
   return Promise.reject(error);
 });
 
-// --- 4. FUNCIONES DE AUTENTICACIÓN (NUEVO) ---
+// --- 4. FUNCIONES DE AUTENTICACIÓN ---
 export const loginUser = async (formData: FormData) => {
-  // FastAPI espera los datos de login como OAuth2 Form Data
   const response = await api.post('/auth/login', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
@@ -65,6 +63,28 @@ export const deleteProduct = async (id: number) => {
 // --- 7. VENTAS ---
 export const registerSale = async (saleData: any) => {
   const response = await api.post('/sales/', saleData);
+  return response.data;
+};
+
+// --- 8. FINANZAS (NUEVO - REQUERIMIENTO JGYSTORE 2.0) ---
+export const getTransactions = async () => {
+  const response = await api.get('/finance/');
+  return response.data;
+};
+
+export const createTransaction = async (data: {
+  type: string;
+  category: string;
+  amount_usd: number;
+  description: string;
+}) => {
+  const response = await api.post('/finance/', data);
+  return response.data;
+};
+
+// Función extra para el balance total si decides usarla en el Dashboard
+export const getFinanceSummary = async () => {
+  const response = await api.get('/finance/summary');
   return response.data;
 };
 

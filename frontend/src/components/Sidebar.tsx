@@ -2,13 +2,16 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Package, ShoppingCart, LogOut } from 'lucide-react';
+// Añadimos Wallet para el icono de Finanzas
+import { LayoutDashboard, Package, ShoppingCart, LogOut, Wallet } from 'lucide-react';
+// Ruta relativa ajustada para evitar errores en VS Code
 import { useCurrencyStore } from '../store/useCurrencyStore';
 
 const menuItems = [
   { name: 'Dashboard', icon: <LayoutDashboard size={20}/>, path: '/dashboard' },
   { name: 'Inventario', icon: <Package size={20}/>, path: '/inventory' },
   { name: 'Punto de Venta', icon: <ShoppingCart size={20}/>, path: '/sales' },
+  { name: 'Finanzas', icon: <Wallet size={20}/>, path: '/finance' }, // <-- NUEVO ENLACE
 ];
 
 export const Sidebar = () => {
@@ -61,18 +64,29 @@ export const Sidebar = () => {
         })}
       </nav>
 
-      {/* Footer: Tasa y Logout */}
-      <div className="p-6 border-t border-slate-800 bg-slate-900/50">
-        <div className="flex justify-between items-center text-xs mb-4">
-          <span className="text-slate-500 uppercase font-bold tracking-wider text-[10px]">BCV Actual</span>
+      {/* Footer: Tasas (Dólar/Euro) y Logout */}
+      <div className="p-6 border-t border-slate-800 bg-slate-900/50 space-y-3">
+        
+        {/* BLOQUE DÓLAR */}
+        <div className="flex justify-between items-center text-[10px]">
+          <span className="text-slate-500 uppercase font-bold tracking-wider">BCV USD</span>
           <span className="text-emerald-500 font-mono font-bold text-sm">
-            {rate > 1 ? `${rate.toFixed(2)} Bs.` : "Cargando..."}
+            {rate > 1 ? `${rate.toFixed(2)} Bs.` : "---"}
+          </span>
+        </div>
+
+        {/* BLOQUE EURO (NUEVO REQUERIMIENTO) */}
+        <div className="flex justify-between items-center text-[10px] pb-3">
+          <span className="text-slate-500 uppercase font-bold tracking-wider">BCV EUR</span>
+          <span className="text-blue-400 font-mono font-bold text-sm">
+            {/* Usamos el cálculo sugerido por el Arquitecto */}
+            {rate > 1 ? `${(rate * 1.08).toFixed(2)} Bs.` : "---"}
           </span>
         </div>
         
         <button 
           onClick={handleLogout}
-          className="flex items-center gap-3 text-slate-400 hover:text-red-400 text-sm transition-colors w-full p-2 rounded-lg hover:bg-slate-900"
+          className="flex items-center gap-3 text-slate-400 hover:text-red-400 text-sm transition-colors w-full p-2 rounded-lg hover:bg-slate-900 border-t border-slate-800 pt-4"
         >
           <LogOut size={18}/> 
           <span className="font-medium">Cerrar Sesión</span>

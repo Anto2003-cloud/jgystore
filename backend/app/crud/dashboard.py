@@ -1,10 +1,11 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from app.models import Sale, SaleItem, Product, ProductVariation, ExchangeRate # Asegúrate de importar ExchangeRate
+# Añadimos FinanceTransaction a los imports
+from app.models.models import Sale, SaleItem, Product, ProductVariation, ExchangeRate, FinanceTransaction
 from app.services.currency import CurrencyService
 
 def get_dashboard_metrics(db: Session):
-    # 1. Ranking de más vendidos
+    # 1. Ranking de más vendidos (Mantenemos tu lógica exacta)
     best_sellers_raw = (
         db.query(
             Product.name,
@@ -24,7 +25,7 @@ def get_dashboard_metrics(db: Session):
         for row in best_sellers_raw
     ]
 
-    # 2. Alertas de Stock Bajo
+    # 2. Alertas de Stock Bajo (Mantenemos tu lógica exacta)
     low_stock_raw = (
         db.query(ProductVariation)
         .join(Product)
@@ -43,7 +44,7 @@ def get_dashboard_metrics(db: Session):
         for v in low_stock_raw
     ]
 
-    # 3. Resumen Financiero
+    # 3. Resumen Financiero con UTILIDAD REAL (Cambio del Arquitecto)
     financials_raw = (
         db.query(
             func.sum(SaleItem.quantity * SaleItem.unit_price_usd),
@@ -53,16 +54,23 @@ def get_dashboard_metrics(db: Session):
     
     rev = financials_raw[0] or 0.0
     cost = financials_raw[1] or 0.0
-    profit = rev - cost
-    margin = (profit / rev * 100) if rev > 0 else 0.0
+    gross_profit = rev - cost
 
-    # --- EL CAMBIO DEL ARQUITECTO AQUÍ ---
-    # Buscamos la tasa directamente para asegurar que sea un número flotante
-    # Buscamos la última tasa (last_rate_obj)
-    last_rate_obj = db.query(ExchangeRate).order_by(ExchangeRate.updated_at.desc()).first()
+    # --- NUEVO: RESTAR GASTOS OPERATIVOS ---
+    total_expenses = db.query(func.sum(FinanceTransaction.amount_usd)).filter(
+        FinanceTransaction.type == "GASTO"
+    ).scalar() or 0.0
+
+    # Utilidad Neta Real
+    net_profit = gross_profit - total_expenses
+    margin = (net_profit / rev * 100) if rev > 0 else 0.0
+
+    # 4. TASAS ACTUALES (USD y EUR)
+    usd_rate_obj = db.query(ExchangeRate).filter(ExchangeRate.currency == "USD").first()
+    eur_rate_obj = db.query(ExchangeRate).filter(ExchangeRate.currency == "EUR").first()
     
-    # Extraemos solo el número. Si no hay nada, ponemos 1.0 de respaldo
-    current_rate = float(last_rate_obj.rate) if last_rate_obj else 1.0
+    current_usd = float(usd_rate_obj.rate) if usd_rate_obj else 1.0
+    current_eur = float(eur_rate_obj.rate) if eur_rate_obj else 1.0
 
     return {
         "best_sellers": best_sellers,
@@ -70,8 +78,13 @@ def get_dashboard_metrics(db: Session):
         "financials": {
             "total_revenue_usd": round(rev, 2),
             "total_cost_usd": round(cost, 2),
-            "net_profit_usd": round(profit, 2),
+            "total_expenses_usd": round(total_expenses, 2), # Nuevo dato
+            "net_profit_usd": round(net_profit, 2),
             "margin_percentage": round(margin, 2)
         },
-        "rate_used": current_rate  # <--- Este nombre debe ser igual al del Esquema
+        "rates": { # Enviamos ambas tasas
+            "USD": current_usd,
+            "EUR": current_eur
+        },
+        "rate_used": current_usd  # Mantenemos este por compatibilidad con tu esquema anterior
     }
