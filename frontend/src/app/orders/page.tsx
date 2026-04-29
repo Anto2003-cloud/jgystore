@@ -1,17 +1,11 @@
 "use client";
 import React, { useEffect, useState } from "react";
 // Rutas relativas para evitar errores de VS Code
-import { getOrders, createOrder, updateOrderStatus } from "../../services/api";
+import { getOrders, createOrder, updateOrderStatus, deleteOrder, updateOrder } from "../../services/api";
 import { useCurrencyStore } from "../../store/useCurrencyStore";
 import { 
-  ClipboardList, 
-  Plus, 
-  Search, 
-  Truck, 
-  CheckCircle, 
-  Clock, 
-  PackageCheck,
-  DollarSign
+  ClipboardList, Plus, Search, Truck, CheckCircle, 
+  PackageCheck, DollarSign, Trash2, Edit, X 
 } from "lucide-react";
 
 const statusColors: any = {
@@ -24,7 +18,9 @@ const statusColors: any = {
 export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [editingOrderId, setEditingOrderId] = useState<number | null>(null);
   const { formatPrice } = useCurrencyStore();
+  
   const [form, setForm] = useState({
     customer_name: "",
     product_details: "",
@@ -43,15 +39,55 @@ export default function OrdersPage() {
 
   useEffect(() => { loadOrders(); }, []);
 
+  // Lógica para permitir borrar el cero en los inputs
+  const handleNumericInput = (field: string, value: string) => {
+    if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
+      setForm({ ...form, [field]: value === "" ? 0 : Number(value) });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await createOrder(form);
-      setForm({ customer_name: "", product_details: "", amount_usd: 0, deposit_usd: 0 });
+      if (editingOrderId) {
+        await updateOrder(editingOrderId, form);
+        alert("Encargo actualizado");
+      } else {
+        await createOrder(form);
+        alert("Encargo registrado");
+      }
+      resetForm();
       loadOrders();
-      alert("Encargo registrado con éxito");
     } catch (error) {
-      alert("Error al registrar el encargo");
+      alert("Error al procesar la solicitud");
+    }
+  };
+
+  const resetForm = () => {
+    setForm({ customer_name: "", product_details: "", amount_usd: 0, deposit_usd: 0 });
+    setEditingOrderId(null);
+  };
+
+  const handleEditClick = (order: any) => {
+    setEditingOrderId(order.id);
+    setForm({
+      customer_name: order.customer_name,
+      product_details: order.product_details,
+      amount_usd: order.amount_usd,
+      deposit_usd: order.deposit_usd
+    });
+    // Scroll hacia arriba para que el usuario vea el formulario relleno
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDelete = async (id: number) => {
+    if (confirm("¿Estás seguro de eliminar este encargo definitivamente?")) {
+      try {
+        await deleteOrder(id);
+        loadOrders();
+      } catch (error) {
+        alert("No se pudo eliminar");
+      }
     }
   };
 
@@ -76,10 +112,11 @@ export default function OrdersPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         
-        {/* FORMULARIO DE NUEVO ENCARGO */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-fit">
+        {/* FORMULARIO DINÁMICO */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-fit sticky top-8">
           <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
-            <Plus size={20} className="text-emerald-500" /> Nuevo Pedido
+            {editingOrderId ? <Edit size={20} className="text-amber-500" /> : <Plus size={20} className="text-emerald-500" />}
+            {editingOrderId ? 'Editar Encargo' : 'Nuevo Pedido'}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -95,24 +132,31 @@ export default function OrdersPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Precio Total ($)</label>
-                <input required type="number" step="0.01" className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                  value={form.amount_usd} onChange={e => setForm({...form, amount_usd: Number(e.target.value)})} />
+                <input required type="text" className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                  value={form.amount_usd === 0 ? "" : form.amount_usd} onChange={e => handleNumericInput("amount_usd", e.target.value)} placeholder="0.00" />
               </div>
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Abono ($)</label>
-                <input required type="number" step="0.01" className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
-                  value={form.deposit_usd} onChange={e => setForm({...form, deposit_usd: Number(e.target.value)})} />
+                <input required type="text" className="w-full mt-1 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                  value={form.deposit_usd === 0 ? "" : form.deposit_usd} onChange={e => handleNumericInput("deposit_usd", e.target.value)} placeholder="0.00" />
               </div>
             </div>
-            <button className="w-full py-4 bg-slate-950 text-white rounded-xl font-bold hover:bg-emerald-600 transition-all flex items-center justify-center gap-2">
-              Crear Encargo
-            </button>
+            
+            <div className="flex flex-col gap-2">
+              <button type="submit" className={`w-full py-4 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${editingOrderId ? 'bg-amber-500 hover:bg-amber-600' : 'bg-slate-950 hover:bg-emerald-600'}`}>
+                {editingOrderId ? 'Guardar Cambios' : 'Crear Encargo'}
+              </button>
+              {editingOrderId && (
+                <button type="button" onClick={resetForm} className="w-full py-2 bg-slate-100 text-slate-500 rounded-xl text-xs font-bold hover:bg-slate-200">
+                  Cancelar Edición
+                </button>
+              )}
+            </div>
           </form>
         </div>
 
         {/* LISTADO DE ENCARGOS */}
         <div className="lg:col-span-3 space-y-4">
-          {/* Buscador */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input type="text" placeholder="Buscar por cliente o producto..." 
@@ -126,7 +170,7 @@ export default function OrdersPage() {
                 <tr>
                   <th className="p-4">Cliente / Producto</th>
                   <th className="p-4">Finanzas</th>
-                  <th className="p-4">Estado</th>
+                  <th className="p-4 text-center">Estado</th>
                   <th className="p-4 text-right">Acciones</th>
                 </tr>
               </thead>
@@ -146,16 +190,23 @@ export default function OrdersPage() {
                         <span className="text-[10px] text-red-400 font-bold">Resta: {formatPrice(order.amount_usd - order.deposit_usd)}</span>
                       </div>
                     </td>
-                    <td className="p-4">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black border ${statusColors[order.status]}`}>
+                    <td className="p-4 text-center">
+                      <span className={`px-3 py-1 rounded-full text-[9px] font-black border ${statusColors[order.status]}`}>
                         {order.status}
                       </span>
                     </td>
                     <td className="p-4">
-                      <div className="flex justify-end gap-1">
-                        <button onClick={() => handleStatusChange(order.id, "EN_TRANSITO")} title="En Tránsito" className="p-2 hover:bg-blue-50 text-blue-500 rounded-lg transition-colors"><Truck size={16}/></button>
-                        <button onClick={() => handleStatusChange(order.id, "RECIBIDO")} title="Recibido" className="p-2 hover:bg-purple-50 text-purple-500 rounded-lg transition-colors"><PackageCheck size={16}/></button>
-                        <button onClick={() => handleStatusChange(order.id, "ENTREGADO")} title="Entregado" className="p-2 hover:bg-emerald-50 text-emerald-500 rounded-lg transition-colors"><CheckCircle size={16}/></button>
+                      <div className="flex justify-end items-center gap-1">
+                        {/* Botones de Estado */}
+                        <button onClick={() => handleStatusChange(order.id, "EN_TRANSITO")} title="En Tránsito" className="p-1.5 hover:bg-blue-50 text-blue-500 rounded-lg"><Truck size={14}/></button>
+                        <button onClick={() => handleStatusChange(order.id, "RECIBIDO")} title="Recibido" className="p-1.5 hover:bg-purple-50 text-purple-500 rounded-lg"><PackageCheck size={14}/></button>
+                        <button onClick={() => handleStatusChange(order.id, "ENTREGADO")} title="Entregado" className="p-1.5 hover:bg-emerald-50 text-emerald-500 rounded-lg"><CheckCircle size={14}/></button>
+                        
+                        <div className="h-6 w-[1px] bg-slate-200 mx-1"></div>
+                        
+                        {/* Botones de Gestión */}
+                        <button onClick={() => handleEditClick(order)} title="Editar" className="p-1.5 hover:bg-amber-50 text-amber-500 rounded-lg"><Edit size={14}/></button>
+                        <button onClick={() => handleDelete(order.id)} title="Borrar" className="p-1.5 hover:bg-red-50 text-red-400 rounded-lg"><Trash2 size={14}/></button>
                       </div>
                     </td>
                   </tr>

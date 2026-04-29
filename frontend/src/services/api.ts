@@ -110,3 +110,11 @@ export const updateOrderStatus = async (orderId: number, status: string) => {
   const response = await api.put(`/orders/${orderId}/status?status=${status}`);
   return response.data;
 };
+
+export const deleteOrder = async (id: number) => {
+  await api.delete(`/orders/${id}`);
+};
+export const updateOrder = async (id: number, data: any) => {
+  const response = await api.put(`/orders/${id}`, data);
+  return response.data;
+};
