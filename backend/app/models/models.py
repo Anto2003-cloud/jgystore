@@ -112,3 +112,20 @@ class User(Base):
 
     def verify_password(self, password: str):
         return pwd_context.verify(password, self.hashed_password)
+    
+    # Al final de backend/app/models/models.py
+
+class Order(Base):
+    __tablename__ = "orders"
+    id = Column(Integer, primary_key=True, index=True)
+    customer_name = Column(String, nullable=False)
+    product_details = Column(String) # Ej: "Jersey Lakers 2024 - M - Jugador"
+    amount_usd = Column(Float, default=0.0) # Precio total acordado
+    deposit_usd = Column(Float, default=0.0) # Lo que el cliente abonó
+    
+    # Estados: PEDIDO, EN_TRANSITO, RECIBIDO, ENTREGADO
+    status = Column(String, default="PEDIDO") 
+    
+    # Fechas para seguimiento
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -89,3 +89,24 @@ export const getFinanceSummary = async () => {
 };
 
 export default api;
+
+// --- 9. ENCARGOS (PEDIDOS BAJO MANDATO) ---
+export const getOrders = async () => {
+  const response = await api.get('/orders/');
+  return response.data;
+};
+
+export const createOrder = async (orderData: {
+  customer_name: string;
+  product_details: string;
+  amount_usd: number;
+  deposit_usd: number;
+}) => {
+  const response = await api.post('/orders/', orderData);
+  return response.data;
+};
+
+export const updateOrderStatus = async (orderId: number, status: string) => {
+  const response = await api.put(`/orders/${orderId}/status?status=${status}`);
+  return response.data;
+};

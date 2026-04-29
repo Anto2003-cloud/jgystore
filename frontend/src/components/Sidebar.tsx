@@ -2,8 +2,8 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-// Añadimos Wallet para el icono de Finanzas
-import { LayoutDashboard, Package, ShoppingCart, LogOut, Wallet } from 'lucide-react';
+// Añadimos ClipboardList para el icono de Encargos
+import { LayoutDashboard, Package, ShoppingCart, LogOut, Wallet, ClipboardList } from 'lucide-react';
 // Ruta relativa ajustada para evitar errores en VS Code
 import { useCurrencyStore } from '../store/useCurrencyStore';
 
@@ -11,7 +11,8 @@ const menuItems = [
   { name: 'Dashboard', icon: <LayoutDashboard size={20}/>, path: '/dashboard' },
   { name: 'Inventario', icon: <Package size={20}/>, path: '/inventory' },
   { name: 'Punto de Venta', icon: <ShoppingCart size={20}/>, path: '/sales' },
-  { name: 'Finanzas', icon: <Wallet size={20}/>, path: '/finance' }, // <-- NUEVO ENLACE
+  { name: 'Finanzas', icon: <Wallet size={20}/>, path: '/finance' },
+  { name: 'Encargos', icon: <ClipboardList size={20}/>, path: '/orders' }, // <-- NUEVO ENLACE
 ];
 
 export const Sidebar = () => {
@@ -20,6 +21,7 @@ export const Sidebar = () => {
   const { rate } = useCurrencyStore(); 
 
   const handleLogout = () => {
+    // Borramos la cookie de autenticación
     document.cookie = "auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     router.push('/login');
     router.refresh();
@@ -38,13 +40,13 @@ export const Sidebar = () => {
           />
         </div>
         <h2 className="text-xl font-bold tracking-tighter text-white uppercase italic">JGYSTORE</h2>
-        <span className="text-[10px] text-emerald-500 font-bold tracking-[0.2em] uppercase">
+        <span className="text-[10px] text-emerald-500 font-bold tracking-[0.2em] uppercase text-center">
           Sport Ecosystem
         </span>
       </div>
 
       {/* Navegación */}
-      <nav className="flex-1 p-4 space-y-2 mt-4">
+      <nav className="flex-1 p-4 space-y-2 mt-4 overflow-y-auto">
         {menuItems.map((item) => {
           const isActive = pathname === item.path;
           return (
@@ -69,17 +71,17 @@ export const Sidebar = () => {
         
         {/* BLOQUE DÓLAR */}
         <div className="flex justify-between items-center text-[10px]">
-          <span className="text-slate-500 uppercase font-bold tracking-wider">BCV USD</span>
+          <span className="text-slate-400 uppercase font-bold tracking-wider text-[9px]">BCV USD</span>
           <span className="text-emerald-500 font-mono font-bold text-sm">
             {rate > 1 ? `${rate.toFixed(2)} Bs.` : "---"}
           </span>
         </div>
 
-        {/* BLOQUE EURO (NUEVO REQUERIMIENTO) */}
+        {/* BLOQUE EURO */}
         <div className="flex justify-between items-center text-[10px] pb-3">
-          <span className="text-slate-500 uppercase font-bold tracking-wider">BCV EUR</span>
+          <span className="text-slate-400 uppercase font-bold tracking-wider text-[9px]">BCV EUR</span>
           <span className="text-blue-400 font-mono font-bold text-sm">
-            {/* Usamos el cálculo sugerido por el Arquitecto */}
+            {/* Cálculo basado en la relación actual EUR/USD aproximada */}
             {rate > 1 ? `${(rate * 1.08).toFixed(2)} Bs.` : "---"}
           </span>
         </div>

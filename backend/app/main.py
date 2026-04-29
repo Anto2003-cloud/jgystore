@@ -9,7 +9,7 @@ from app.db.session import SessionLocal, engine
 from app.models.models import Base # Aseguramos la ruta a tus modelos
 
 # --- IMPORTACIONES DE ENDPOINTS (INCLUYENDO FINANCE) ---
-from app.api.v1.endpoints import auth, products, sales, dashboard, finance
+from app.api.v1.endpoints import auth, products, sales, dashboard, finance, orders # <-- 
 
 # Crear tablas al iniciar (Neon o SQLite)
 Base.metadata.create_all(bind=engine)
@@ -35,6 +35,7 @@ app.include_router(sales.router, prefix="/api/v1/sales", tags=["Sales"])
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["Dashboard"])
 # NUEVA RUTA DE FINANZAS REGISTRADA
 app.include_router(finance.router, prefix="/api/v1/finance", tags=["Finance"])
+app.include_router(orders.router, prefix="/api/v1/orders", tags=["Orders"])
 
 # --- LÓGICA DE ACTUALIZACIÓN DE MONEDA (BCV) ---
 def update_currency_task():
