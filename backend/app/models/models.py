@@ -4,31 +4,25 @@ from datetime import datetime
 import enum
 from passlib.context import CryptContext
 
-# Usamos la base que ya tenías definida
 Base = declarative_base()
-
-# --- SEGURIDAD ---
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
-# --- ENUMS ---
-class VersionEnum(enum.Enum):
+class VersionEnum(str, enum.Enum):
     FAN = "FAN"
     PLAYER = "PLAYER"
     RETRO = "RETRO"
     NONE = "NONE"
 
-class CurrencySource(enum.Enum):
+class CurrencySource(str, enum.Enum):
     BCV = "BCV"
     P2P = "P2P"
     Manual = "Manual"
 
-# --- MODELOS ---
-
 class ExchangeRate(Base):
     __tablename__ = "exchange_rates"
     id = Column(Integer, primary_key=True, index=True)
-    source = Column(Enum(CurrencySource), default=CurrencySource.BCV)
-    currency = Column(String, default="USD") # "USD" o "EUR"
+    source = Column(String, default="BCV")
+    currency = Column(String, default="USD")
     rate = Column(Float, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -41,7 +35,7 @@ class Product(Base):
     base_cost_usd = Column(Float, default=0.0) 
     freight_cost_usd = Column(Float, default=0.0) 
     target_margin = Column(Float, default=0.35)
-    is_active = Column(Boolean, default=True) # FIX BUG ELIMINAR
+    is_active = Column(Boolean, default=True)
 
     variations = relationship("ProductVariation", back_populates="product", cascade="all, delete-orphan")
 
@@ -50,7 +44,7 @@ class ProductVariation(Base):
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"))
     size = Column(String, nullable=False)
-    version = Column(Enum(VersionEnum), default=VersionEnum.FAN)
+    version = Column(String, default="FAN") # Usamos String para evitar conflictos de Enum
     sku = Column(String, unique=True, index=True)
     stock = Column(Integer, default=0)
     min_stock_alert = Column(Integer, default=3)
@@ -69,31 +63,28 @@ class Customer(Base):
 class Sale(Base):
     __tablename__ = "sales"
     id = Column(Integer, primary_key=True, index=True)
-    customer_id = Column(Integer, ForeignKey("customers.id"))
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
     total_usd = Column(Float, nullable=False)
     total_bs = Column(Float, nullable=False)
     exchange_rate_used = Column(Float, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
-    
     items = relationship("SaleItem", back_populates="sale")
 
 class SaleItem(Base):
     __tablename__ = "sale_items"
     id = Column(Integer, primary_key=True, index=True)
     sale_id = Column(Integer, ForeignKey("sales.id"))
-    variation_id = Column(Integer, ForeignKey("product_variations.id"))
+    variation_id = Column(Integer, ForeignKey("product_variations.id"), nullable=True)
     quantity = Column(Integer, nullable=False)
     unit_price_usd = Column(Float, nullable=False)
     unit_cost_at_sale = Column(Float, nullable=False) 
-
     sale = relationship("Sale", back_populates="items")
 
-# --- REEMPLAZO DE EXPENSE POR FINANCETRANSACTION ---
 class FinanceTransaction(Base):
     __tablename__ = "finance_transactions"
     id = Column(Integer, primary_key=True, index=True)
     type = Column(String) # "INVERSION" o "GASTO"
-    category = Column(String) # "Publicidad", "Flete", etc.
+    category = Column(String)
     amount_usd = Column(Float, nullable=False)
     description = Column(String)
     date = Column(DateTime, default=datetime.utcnow)
@@ -113,19 +104,13 @@ class User(Base):
     def verify_password(self, password: str):
         return pwd_context.verify(password, self.hashed_password)
     
-    # Al final de backend/app/models/models.py
-
 class Order(Base):
     __tablename__ = "orders"
     id = Column(Integer, primary_key=True, index=True)
     customer_name = Column(String, nullable=False)
-    product_details = Column(String) # Ej: "Jersey Lakers 2024 - M - Jugador"
-    amount_usd = Column(Float, default=0.0) # Precio total acordado
-    deposit_usd = Column(Float, default=0.0) # Lo que el cliente abonó
-    
-    # Estados: PEDIDO, EN_TRANSITO, RECIBIDO, ENTREGADO
+    product_details = Column(String)
+    amount_usd = Column(Float, default=0.0)
+    deposit_usd = Column(Float, default=0.0)
     status = Column(String, default="PEDIDO") 
-    
-    # Fechas para seguimiento
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
