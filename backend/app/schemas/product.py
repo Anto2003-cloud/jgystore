@@ -1,34 +1,19 @@
-from pydantic import BaseModel, Field, field_validator # Agregamos field_validator
+from pydantic import BaseModel, Field
 from typing import List, Optional
-from enum import Enum
 
-class VersionEnum(str, Enum):
-    FAN = "FAN"
-    PLAYER = "PLAYER"
-    RETRO = "RETRO"
-    NONE = "NONE"
-
-# --- VARIACIONES ---
+# --- VARIACIONES (Simplificadas) ---
 class VariationBase(BaseModel):
-    size: str = Field(..., example="L")
-    version: VersionEnum = VersionEnum.FAN
-    stock: int = Field(default=0, ge=0)
-    min_stock_alert: int = Field(default=3)
-
-    # 🔥 NUEVO: Este validador corrige el error de "Fan" vs "FAN"
-    @field_validator('version', mode='before')
-    @classmethod
-    def to_uppercase(cls, v):
-        if isinstance(v, str):
-            return v.upper() # Convierte "Fan" en "FAN" automáticamente
-        return v
+    size: str
+    version: str  # Ahora es un string simple, más flexible
+    stock: int = 0
+    min_stock_alert: int = 2
 
 class VariationCreate(VariationBase):
     pass
 
 class VariationRead(VariationBase):
     id: int
-    sku: Optional[str]
+    sku: Optional[str] = None
     
     class Config:
         from_attributes = True
@@ -37,7 +22,7 @@ class VariationRead(VariationBase):
 class ProductBase(BaseModel):
     name: str
     category: str
-    description: Optional[str] = None
+    description: Optional[str] = ""
     base_cost_usd: float
     freight_cost_usd: float
     target_margin: float
@@ -49,9 +34,10 @@ class ProductCreate(ProductBase):
 class ProductRead(ProductBase):
     id: int
     variations: List[VariationRead]
-    price_usd: float 
-    price_bs: float
-    profit_usd: float
+    # Campos calculados para el frontend
+    price_usd: float = 0.0
+    price_bs: float = 0.0
+    profit_usd: float = 0.0
 
     class Config:
         from_attributes = True

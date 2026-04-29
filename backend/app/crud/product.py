@@ -2,19 +2,22 @@ from sqlalchemy.orm import Session
 from app.models import Product, ProductVariation
 from app.schemas.product import ProductCreate
 import uuid
-
 def create_product(db: Session, product_in: ProductCreate):
-    # 1. Crear la instancia del producto base
     db_product = Product(
         name=product_in.name,
         category=product_in.category,
         description=product_in.description,
         base_cost_usd=product_in.base_cost_usd,
         freight_cost_usd=product_in.freight_cost_usd,
-        target_margin=product_in.target_margin
+        target_margin=product_in.target_margin,
+        is_active=True # Forzamos que sea True al crear
     )
     db.add(db_product)
-    db.flush()  # Para obtener el ID del producto antes de commit
+    db.flush()
+    # ... resto de la lógica de variaciones ...
+    db.commit()
+    db.refresh(db_product)
+    return db_product
 
     # 2. Crear las variaciones (tallas/versiones)
     for var in product_in.variations:

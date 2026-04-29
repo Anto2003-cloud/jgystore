@@ -78,16 +78,15 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
       name: baseData.name,
       category: baseData.category,
       description: baseData.description || "",
-      // Forzamos que sean números reales
-      base_cost_usd: parseFloat(baseData.base_cost_usd.toString()),
-      freight_cost_usd: parseFloat(baseData.freight_cost_usd.toString()),
-      target_margin: parseFloat(baseData.target_margin.toString()),
+      base_cost_usd: Number(baseData.base_cost_usd),
+      freight_cost_usd: Number(baseData.freight_cost_usd),
+      target_margin: Number(baseData.target_margin),
       is_active: true,
       variations: variations.map(v => ({
-        size: v.size,
-        version: v.version.toUpperCase(), // Refuerzo de mayúsculas
-        stock: parseInt(v.stock.toString()),
-        min_stock_alert: parseInt(v.min_stock_alert?.toString() || "2")
+        size: String(v.size),
+        version: String(v.version).toUpperCase(), 
+        stock: Number(v.stock),
+        min_stock_alert: Number(v.min_stock_alert || 2)
       }))
     };
 
@@ -99,10 +98,18 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
     
     onRefresh();
     onClose();
-    alert("¡Éxito! Producto registrado.");
+    alert("¡Producto guardado exitosamente!");
   } catch (error: any) {
-    console.error("Error detallado:", error.response?.data);
-    alert("Fallo de validación: " + JSON.stringify(error.response?.data?.detail));
+    // ESTA LÓGICA MUESTRA EL ERROR REAL DEL BACKEND
+    const serverError = error.response?.data?.detail;
+    console.error("Error completo del servidor:", serverError);
+    
+    // Si el error es una lista (Pydantic), mostramos el primer mensaje
+    const message = Array.isArray(serverError) 
+      ? serverError[0].msg 
+      : (typeof serverError === 'string' ? serverError : "Error desconocido");
+
+    alert("Error del servidor: " + message);
   }
 };
   return (
