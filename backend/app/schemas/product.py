@@ -28,11 +28,12 @@ class VariationRead(VariationBase):
 # --- PRODUCTOS ---
 class ProductBase(BaseModel):
     name: str
-    category: str # Fútbol, NBA, etc.
+    category: str
     description: Optional[str] = None
-    base_cost_usd: float = Field(..., gt=0)
-    freight_cost_usd: float = Field(default=0)
-    target_margin: float = Field(default=0.35, le=0.9)
+    base_cost_usd: float
+    freight_cost_usd: float
+    target_margin: float
+    is_active: Optional[bool] = True # <--- Asegúrate de que tenga el default True aquí
 
 class ProductCreate(ProductBase):
     variations: List[VariationCreate] # Al crear un producto, enviamos sus tallas iniciales

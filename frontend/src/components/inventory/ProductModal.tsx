@@ -7,7 +7,6 @@ import { createProduct, updateProduct } from "../../services/api";
 export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any) => {
   const { formatPrice } = useCurrencyStore();
   
-  // Estado inicial limpio
   const initialState = {
     name: "",
     category: "Futbol",
@@ -22,11 +21,9 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
     { size: "S", version: "FAN", stock: 0, min_stock_alert: 2 }
   ]);
 
-  // 🔥 ESTA ES LA CLAVE: Detecta cambios y resetea o carga datos
   useEffect(() => {
     if (isOpen) {
       if (editingProduct) {
-        // Cargar datos existentes para editar
         setBaseData({
           name: editingProduct.name,
           category: editingProduct.category || "Futbol",
@@ -37,7 +34,6 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
         });
         setVariations(editingProduct.variations || []);
       } else {
-        // Limpiar todo para producto nuevo
         setBaseData(initialState);
         setVariations([{ size: "S", version: "FAN", stock: 0, min_stock_alert: 2 }]);
       }
@@ -45,6 +41,24 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
   }, [isOpen, editingProduct]);
 
   if (!isOpen) return null;
+
+  // LÓGICA PARA PERMITIR BORRAR EL CERO Y ESCRIBIR LIBREMENTE
+  const handleNumericInput = (field: string, value: string, index?: number) => {
+    // Permitir solo números y un punto decimal
+    if (value !== "" && !/^\d*\.?\d*$/.test(value)) return;
+
+    const numericValue = value === "" ? 0 : parseFloat(value);
+
+    if (index !== undefined) {
+      // Es una variación (Stock)
+      const newVars = [...variations];
+      newVars[index] = { ...newVars[index], [field]: numericValue };
+      setVariations(newVars);
+    } else {
+      // Es un campo base (Costo/Flete)
+      setBaseData({ ...baseData, [field]: numericValue });
+    }
+  };
 
   const totalCost = Number(baseData.base_cost_usd) + Number(baseData.freight_cost_usd);
   const predictedPriceUsd = totalCost / (1 - baseData.target_margin);
@@ -60,7 +74,22 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const payload = { ...baseData, variations, price_usd: predictedPriceUsd };
+      // CONSTRUCCIÓN DEL PAYLOAD EXPLÍCITO (Evita errores de validación)
+      const payload = {
+        name: baseData.name,
+        category: baseData.category,
+        description: baseData.description,
+        base_cost_usd: Number(baseData.base_cost_usd),
+        freight_cost_usd: Number(baseData.freight_cost_usd),
+        target_margin: Number(baseData.target_margin),
+        is_active: true,
+        variations: variations.map(v => ({
+          size: v.size,
+          version: v.version,
+          stock: Number(v.stock),
+          min_stock_alert: Number(v.min_stock_alert)
+        }))
+      };
       
       if (editingProduct) {
         await updateProduct(editingProduct.id, payload);
@@ -70,22 +99,23 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
       
       onRefresh();
       onClose();
-    } catch (error) {
-      alert("Error al procesar el producto.");
-      console.error(error);
+      alert("Producto guardado con éxito.");
+    } catch (error: any) {
+      alert("Error al procesar el producto. Verifica los datos.");
+      console.error("Error detallado:", error.response?.data || error);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-slate-900">
       <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
-        {/* Header Dinámico */}
+        
         <div className="p-6 border-b flex justify-between items-center bg-slate-50">
-          <h2 className="text-2xl font-bold text-slate-800">
+          <h2 className="text-2xl font-bold text-slate-800 italic">
             {editingProduct ? 'Editar Producto' : 'Registrar Nuevo Producto'}
           </h2>
-          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
-            <X size={24} className="text-slate-600" />
+          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors text-slate-500">
+            <X size={24} />
           </button>
         </div>
 
@@ -93,75 +123,73 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-6">
               <h3 className="text-lg font-semibold text-blue-600 flex items-center gap-2">
-                <Calculator size={18} /> Costos y Margen
+                <Calculator size={18} /> Finanzas del Producto
               </h3>
               
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nombre del Modelo</label>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Nombre del Modelo</label>
                 <input 
-                  required 
-                  type="text" 
-                  className="w-full p-3 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
+                  required type="text" 
+                  className="w-full p-3 rounded-xl border border-slate-200 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-blue-500" 
                   value={baseData.name} 
                   onChange={e => setBaseData({...baseData, name: e.target.value})} 
+                  placeholder="Ej: Jersey Venezuela 2024"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Costo Prenda ($)</label>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Costo Prenda ($)</label>
                   <input 
-                    required 
-                    type="number" 
-                    step="0.01" 
-                    className="w-full p-3 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
-                    value={baseData.base_cost_usd} 
-                    onChange={e => setBaseData({...baseData, base_cost_usd: Number(e.target.value)})} 
+                    required type="text"
+                    className="w-full p-3 rounded-xl border border-slate-200 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-blue-500" 
+                    value={baseData.base_cost_usd === 0 ? "" : baseData.base_cost_usd} 
+                    onChange={e => handleNumericInput("base_cost_usd", e.target.value)}
+                    placeholder="0.00"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Costo Flete ($)</label>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Costo Flete ($)</label>
                   <input 
-                    required 
-                    type="number" 
-                    step="0.01" 
-                    className="w-full p-3 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none" 
-                    value={baseData.freight_cost_usd} 
-                    onChange={e => setBaseData({...baseData, freight_cost_usd: Number(e.target.value)})} 
+                    required type="text"
+                    className="w-full p-3 rounded-xl border border-slate-200 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-blue-500" 
+                    value={baseData.freight_cost_usd === 0 ? "" : baseData.freight_cost_usd} 
+                    onChange={e => handleNumericInput("freight_cost_usd", e.target.value)} 
+                    placeholder="0.00"
                   />
                 </div>
               </div>
 
-              <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl">
-                <p className="text-emerald-800 text-xs font-bold uppercase tracking-wider mb-2">Previsualización de Venta</p>
-                <div className="flex justify-between items-end">
+              <div className="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl">
+                <p className="text-emerald-800 text-[10px] font-black uppercase tracking-[0.1em] mb-2">Precio de Venta Sugerido</p>
+                <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-2xl font-black text-emerald-700">{formatPrice(predictedPriceUsd)}</p>
-                    <p className="text-xs text-emerald-600">Basado en margen del {baseData.target_margin * 100}%</p>
+                    <p className="text-3xl font-black text-emerald-700 leading-none">{formatPrice(predictedPriceUsd)}</p>
+                    <p className="text-[10px] text-emerald-600 mt-1 font-bold">Margen del {(baseData.target_margin * 100).toFixed(0)}% Aplicado</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-slate-500">Utilidad Bruta:</p>
-                    <p className="text-lg font-bold text-slate-700">${(predictedPriceUsd - totalCost).toFixed(2)}</p>
+                  <div className="text-right border-l border-emerald-200 pl-4">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase">Utilidad</p>
+                    <p className="text-xl font-bold text-slate-700">${(predictedPriceUsd - totalCost).toFixed(2)}</p>
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-blue-600">Variaciones de Talla</h3>
-                <button type="button" onClick={addVariation} className="text-xs bg-blue-600 text-white px-3 py-1 rounded-full flex items-center gap-1 hover:bg-blue-700">
-                  <Plus size={14} /> Añadir Talla
+              <div className="flex justify-between items-center border-b pb-2">
+                <h3 className="text-lg font-semibold text-blue-600">Stock por Tallas</h3>
+                <button type="button" onClick={addVariation} className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded-full font-bold uppercase hover:bg-blue-700 transition-all flex items-center gap-1">
+                  <Plus size={12} /> Añadir Talla
                 </button>
               </div>
 
-              <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
+              <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
                 {variations.map((v: any, index: number) => (
-                  <div key={index} className="flex gap-2 items-end bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <div key={index} className="flex gap-2 items-end bg-slate-50 p-4 rounded-2xl border border-slate-100 group transition-all hover:border-blue-200">
                     <div className="flex-1">
-                      <label className="text-[10px] uppercase font-bold text-slate-400">Talla</label>
+                      <label className="text-[9px] uppercase font-black text-slate-400 mb-1 block">Talla</label>
                       <select 
-                        className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 outline-none focus:ring-2 focus:ring-blue-500" 
+                        className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none" 
                         value={v.size} 
                         onChange={e => {
                           const newVars = [...variations];
@@ -172,9 +200,9 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
                       </select>
                     </div>
                     <div className="flex-1">
-                      <label className="text-[10px] uppercase font-bold text-slate-400">Versión</label>
+                      <label className="text-[9px] uppercase font-black text-slate-400 mb-1 block">Versión</label>
                       <select 
-                        className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 outline-none focus:ring-2 focus:ring-blue-500" 
+                        className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none" 
                         value={v.version}
                         onChange={e => {
                           const newVars = [...variations];
@@ -186,20 +214,17 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
                         <option value="RETRO">Retro</option>
                       </select>
                     </div>
-                    <div className="w-16">
-                      <label className="text-[10px] uppercase font-bold text-slate-400">Stock</label>
+                    <div className="w-20">
+                      <label className="text-[9px] uppercase font-black text-slate-400 mb-1 block">Stock</label>
                       <input 
-                        type="number" 
-                        className="w-full p-1.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-900 outline-none focus:ring-2 focus:ring-blue-500" 
-                        value={v.stock}
-                        onChange={e => {
-                          const newVars = [...variations];
-                          newVars[index].stock = Number(e.target.value);
-                          setVariations(newVars);
-                        }} 
+                        type="text"
+                        className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-center text-blue-600 outline-none" 
+                        value={v.stock === 0 ? "" : v.stock}
+                        onChange={e => handleNumericInput("stock", e.target.value, index)}
+                        placeholder="0"
                       />
                     </div>
-                    <button type="button" onClick={() => removeVariation(index)} className="p-2 text-red-400 hover:text-red-600 transition-colors">
+                    <button type="button" onClick={() => removeVariation(index)} className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
                       <Trash2 size={18} />
                     </button>
                   </div>
@@ -209,11 +234,11 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
           </div>
 
           <div className="mt-10 flex gap-4">
-            <button type="button" onClick={onClose} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all">
+            <button type="button" onClick={onClose} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-wider hover:bg-slate-200 transition-all">
               Cancelar
             </button>
-            <button type="submit" className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">
-              {editingProduct ? 'Actualizar Producto' : 'Guardar Producto'}
+            <button type="submit" className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-wider shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all transform hover:-translate-y-0.5 active:translate-y-0">
+              {editingProduct ? 'Actualizar Cambios' : 'Finalizar Registro'}
             </button>
           </div>
         </form>
