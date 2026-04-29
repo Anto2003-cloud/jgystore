@@ -71,41 +71,40 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
     setVariations(variations.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      // CONSTRUCCIÓN DEL PAYLOAD EXPLÍCITO (Evita errores de validación)
-      const payload = {
-        name: baseData.name,
-        category: baseData.category,
-        description: baseData.description,
-        base_cost_usd: Number(baseData.base_cost_usd),
-        freight_cost_usd: Number(baseData.freight_cost_usd),
-        target_margin: Number(baseData.target_margin),
-        is_active: true,
-        variations: variations.map(v => ({
-          size: v.size,
-          version: v.version,
-          stock: Number(v.stock),
-          min_stock_alert: Number(v.min_stock_alert)
-        }))
-      };
-      
-      if (editingProduct) {
-        await updateProduct(editingProduct.id, payload);
-      } else {
-        await createProduct(payload);
-      }
-      
-      onRefresh();
-      onClose();
-      alert("Producto guardado con éxito.");
-    } catch (error: any) {
-      alert("Error al procesar el producto. Verifica los datos.");
-      console.error("Error detallado:", error.response?.data || error);
-    }
-  };
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  try {
+    const payload = {
+      name: baseData.name,
+      category: baseData.category,
+      description: baseData.description || "",
+      // Forzamos que sean números reales
+      base_cost_usd: parseFloat(baseData.base_cost_usd.toString()),
+      freight_cost_usd: parseFloat(baseData.freight_cost_usd.toString()),
+      target_margin: parseFloat(baseData.target_margin.toString()),
+      is_active: true,
+      variations: variations.map(v => ({
+        size: v.size,
+        version: v.version.toUpperCase(), // Refuerzo de mayúsculas
+        stock: parseInt(v.stock.toString()),
+        min_stock_alert: parseInt(v.min_stock_alert?.toString() || "2")
+      }))
+    };
 
+    if (editingProduct) {
+      await updateProduct(editingProduct.id, payload);
+    } else {
+      await createProduct(payload);
+    }
+    
+    onRefresh();
+    onClose();
+    alert("¡Éxito! Producto registrado.");
+  } catch (error: any) {
+    console.error("Error detallado:", error.response?.data);
+    alert("Fallo de validación: " + JSON.stringify(error.response?.data?.detail));
+  }
+};
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-slate-900">
       <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator # Agregamos field_validator
 from typing import List, Optional
 from enum import Enum
 
@@ -14,6 +14,14 @@ class VariationBase(BaseModel):
     version: VersionEnum = VersionEnum.FAN
     stock: int = Field(default=0, ge=0)
     min_stock_alert: int = Field(default=3)
+
+    # 🔥 NUEVO: Este validador corrige el error de "Fan" vs "FAN"
+    @field_validator('version', mode='before')
+    @classmethod
+    def to_uppercase(cls, v):
+        if isinstance(v, str):
+            return v.upper() # Convierte "Fan" en "FAN" automáticamente
+        return v
 
 class VariationCreate(VariationBase):
     pass
@@ -33,15 +41,14 @@ class ProductBase(BaseModel):
     base_cost_usd: float
     freight_cost_usd: float
     target_margin: float
-    is_active: Optional[bool] = True # <--- Asegúrate de que tenga el default True aquí
+    is_active: Optional[bool] = True
 
 class ProductCreate(ProductBase):
-    variations: List[VariationCreate] # Al crear un producto, enviamos sus tallas iniciales
+    variations: List[VariationCreate]
 
 class ProductRead(ProductBase):
     id: int
     variations: List[VariationRead]
-    # Campos calculados que enviaremos al Frontend
     price_usd: float 
     price_bs: float
     profit_usd: float
