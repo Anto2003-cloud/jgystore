@@ -1,15 +1,16 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Enum, Table, JSON
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Enum, JSON, Boolean
 from sqlalchemy.orm import relationship, declarative_base
 from datetime import datetime
 import enum
 from passlib.context import CryptContext
 
+# Usamos la base que ya tenías definida
 Base = declarative_base()
 
-# --- CAMBIO SEGÚN AI STUDIO ---
-# Usamos pbkdf2_sha256 para evitar el error de los 72 bytes en Windows
+# --- SEGURIDAD ---
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
+# --- ENUMS ---
 class VersionEnum(enum.Enum):
     FAN = "FAN"
     PLAYER = "PLAYER"
@@ -21,40 +22,34 @@ class CurrencySource(enum.Enum):
     P2P = "P2P"
     Manual = "Manual"
 
+# --- MODELOS ---
+
 class ExchangeRate(Base):
     __tablename__ = "exchange_rates"
     id = Column(Integer, primary_key=True, index=True)
     source = Column(Enum(CurrencySource), default=CurrencySource.BCV)
-    rate = Column(Float, nullable=False) # Valor en Bs.
+    currency = Column(String, default="USD") # "USD" o "EUR"
+    rate = Column(Float, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-class Supplier(Base):
-    __tablename__ = "suppliers"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    contact = Column(String)
 
 class Product(Base):
     __tablename__ = "products"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True, nullable=False)
-    category = Column(String) # Futbol, NBA, etc.
+    category = Column(String) 
     description = Column(String)
-    
-    # Costos base en USD
     base_cost_usd = Column(Float, default=0.0) 
-    freight_cost_usd = Column(Float, default=0.0) # Costo de envío prorrateado
-    
-    # Margen deseado (ej: 0.40 para 40%)
+    freight_cost_usd = Column(Float, default=0.0) 
     target_margin = Column(Float, default=0.35)
-    
-    variations = relationship("ProductVariation", back_populates="product", cascade="all, delete")
+    is_active = Column(Boolean, default=True) # FIX BUG ELIMINAR
+
+    variations = relationship("ProductVariation", back_populates="product", cascade="all, delete-orphan")
 
 class ProductVariation(Base):
     __tablename__ = "product_variations"
     id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.id"))
-    size = Column(String, nullable=False) # S, M, L, XL, XXL
+    product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"))
+    size = Column(String, nullable=False)
     version = Column(Enum(VersionEnum), default=VersionEnum.FAN)
     sku = Column(String, unique=True, index=True)
     stock = Column(Integer, default=0)
@@ -68,6 +63,8 @@ class Customer(Base):
     full_name = Column(String, nullable=False)
     phone = Column(String)
     email = Column(String, unique=True)
+    points = Column(Integer, default=0)
+    preferences = Column(JSON)
 
 class Sale(Base):
     __tablename__ = "sales"
@@ -91,28 +88,27 @@ class SaleItem(Base):
 
     sale = relationship("Sale", back_populates="items")
 
-class Expense(Base):
-    __tablename__ = "expenses"
+# --- REEMPLAZO DE EXPENSE POR FINANCETRANSACTION ---
+class FinanceTransaction(Base):
+    __tablename__ = "finance_transactions"
     id = Column(Integer, primary_key=True, index=True)
-    description = Column(String)
+    type = Column(String) # "INVERSION" o "GASTO"
+    category = Column(String) # "Publicidad", "Flete", etc.
     amount_usd = Column(Float, nullable=False)
-    category = Column(String) # Alquiler, publicidad, etc.
+    description = Column(String)
     date = Column(DateTime, default=datetime.utcnow)
 
-# --- CLASE USUARIO FINAL ---
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     full_name = Column(String)
-    role = Column(String, default="admin") # admin, seller
+    role = Column(String, default="admin")
 
     @staticmethod
     def get_password_hash(password: str):
-        """Genera el hash usando el nuevo algoritmo pbkdf2_sha256"""
         return pwd_context.hash(password)
 
     def verify_password(self, password: str):
-        """Verifica la contraseña contra el hash almacenado"""
         return pwd_context.verify(password, self.hashed_password)

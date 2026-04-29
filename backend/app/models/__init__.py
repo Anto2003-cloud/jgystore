@@ -1,6 +1,6 @@
 # backend/app/models/__init__.py
 
-# Importamos todo de tu archivo models.py para que sea accesible fácilmente
+# Importamos solo las clases que existen en tu archivo models.py
 from .models import (
     Base, 
     User, 
@@ -9,8 +9,5 @@ from .models import (
     ExchangeRate, 
     Sale, 
     SaleItem, 
-    Expense, 
-    Customer,
-    VersionEnum,
-    CurrencySource
+    FinanceTransaction # <--- Este es el nuevo nombre para la gestión de dinero
 )

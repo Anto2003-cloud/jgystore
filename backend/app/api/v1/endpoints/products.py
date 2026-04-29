@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
-import uuid  # <--- NUEVO: Necesario para generar los SKUs únicos
+import uuid
 from app.db.session import SessionLocal
 from app.schemas.product import ProductCreate, ProductRead
 from app.crud import product as crud_product
 from app.services.pricing import PricingService
 from app.services.currency import CurrencyService
 
-# ARREGLO TÉCNICO: Respetando tu estructura de carpetas
+# Respetando tu estructura de modelos
 from app.models.models import Product, ProductVariation
 
 router = APIRouter()
@@ -26,19 +26,17 @@ def create_new_product(product_in: ProductCreate, db: Session = Depends(get_db))
     # 1. Crear el producto en la DB
     new_product = crud_product.create_product(db, product_in)
     
-    # 2. Refrescar para traer los datos guardados
     db.refresh(new_product)
     
-    # 3. Obtener la tasa de forma segura
+    # 2. Obtener la tasa de forma segura
     current_rate_obj = CurrencyService.get_latest_rate(db)
     
-    # Manejo de tasa según el tipo de objeto retornado
     if hasattr(current_rate_obj, 'rate'):
         rate_value = current_rate_obj.rate
     else:
-        rate_value = current_rate_obj if isinstance(current_rate_obj, float) else 481.6989 
+        rate_value = current_rate_obj if isinstance(current_rate_obj, float) else 48.0 # Tasa base fallback 2026
     
-    # 4. Calcular precios
+    # 3. Calcular precios
     pricing = PricingService.calculate_prices(
         new_product.base_cost_usd, 
         new_product.freight_cost_usd, 
@@ -46,7 +44,6 @@ def create_new_product(product_in: ProductCreate, db: Session = Depends(get_db))
         rate_value
     )
     
-    # 5. Inyectar cálculos para la respuesta
     new_product.price_usd = pricing["price_usd"]
     new_product.price_bs = pricing["price_bs"]
     new_product.profit_usd = pricing["profit_usd"]
@@ -55,9 +52,10 @@ def create_new_product(product_in: ProductCreate, db: Session = Depends(get_db))
 
 @router.get("/", response_model=List[ProductRead])
 def read_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    products = crud_product.get_products(db, skip=skip, limit=limit)
-    current_rate = CurrencyService.get_latest_rate(db)
+    # --- CAMBIO SEGÚN EMPRESA: Solo productos activos ---
+    products = db.query(Product).filter(Product.is_active == True).offset(skip).limit(limit).all()
     
+    current_rate = CurrencyService.get_latest_rate(db)
     rate_value = current_rate.rate if hasattr(current_rate, 'rate') else current_rate
 
     for p in products:
@@ -79,11 +77,12 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
     if not db_product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     
-    db.delete(db_product)
+    # --- FIX BUG: BORRADO LÓGICO ---
+    # En lugar de eliminar, desactivamos para mantener integridad con ventas pasadas
+    db_product.is_active = False
     db.commit()
-    return {"message": "Producto eliminado correctamente"}
+    return {"message": "Producto desactivado correctamente (Borrado Lógico)"}
 
-# --- TAREA 1: ENDPOINT ROBUSTECIDO POR EL ARQUITECTO ---
 @router.put("/{product_id}", response_model=ProductRead)
 def update_product(product_id: int, product_in: ProductCreate, db: Session = Depends(get_db)):
     db_product = db.query(Product).filter(Product.id == product_id).first()
@@ -91,7 +90,7 @@ def update_product(product_id: int, product_in: ProductCreate, db: Session = Dep
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     
     try:
-        # 1. Actualizar campos base del producto
+        # 1. Actualizar campos base
         db_product.name = product_in.name
         db_product.category = product_in.category
         db_product.description = product_in.description
@@ -99,12 +98,10 @@ def update_product(product_id: int, product_in: ProductCreate, db: Session = Dep
         db_product.freight_cost_usd = product_in.freight_cost_usd
         db_product.target_margin = product_in.target_margin
 
-        # 2. Borrar variaciones anteriores (Estrategia de limpieza atómica)
+        # 2. Reemplazo de variaciones
         db.query(ProductVariation).filter(ProductVariation.product_id == product_id).delete()
 
-        # 3. Crear las nuevas variaciones con SKU generado
         for var in product_in.variations:
-            # Generamos un SKU único: Nom-Talla-Versión-IDCorta
             generated_sku = f"{product_in.name[:3].upper()}-{var.size}-{var.version.value[:1]}-{str(uuid.uuid4())[:4]}"
             
             new_var = ProductVariation(
@@ -120,7 +117,7 @@ def update_product(product_id: int, product_in: ProductCreate, db: Session = Dep
         db.commit()
         db.refresh(db_product)
 
-        # 4. Inyectar precios calculados para que el frontend vea el cambio de inmediato
+        # 3. Inyectar precios para el frontend
         current_rate = CurrencyService.get_latest_rate(db)
         rate_value = current_rate.rate if hasattr(current_rate, 'rate') else current_rate
 
