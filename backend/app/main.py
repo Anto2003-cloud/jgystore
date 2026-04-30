@@ -66,13 +66,20 @@ def update_currency_task():
     finally:
         db.close()
 
+# Dentro de backend/app/main.py
+
 @app.on_event("startup")
 def startup_event():
+    # Iniciamos el reloj de fondo
     scheduler = BackgroundScheduler()
-    # Se ejecuta cada hora
-    scheduler.add_job(update_currency_task, 'interval', hours=1)
+    # Intentará actualizar cada 30 minutos mientras el servidor esté despierto
+    scheduler.add_job(update_currency_task, 'interval', minutes=30)
     scheduler.start()
-    # Ejecución inicial inmediata para asegurar que al arrancar tengamos tasas
+    
+    # EJECUCIÓN INMEDIATA: 
+    # Esto asegura que apenas Render "despierta" el servidor, 
+    # las tasas se actualicen sin esperar al cron.
+    print("Servidor despertando... Actualizando tasas inmediatamente.")
     update_currency_task()
 
 @app.get("/")
