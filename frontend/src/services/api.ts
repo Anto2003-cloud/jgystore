@@ -128,3 +128,9 @@ export const createCustomer = async (data: any) => {
   const response = await api.post('/customers/', data);
   return response.data;
 };
+
+export const deleteFinance = (id: number) => api.delete(`/finance/${id}`);
+export const updateFinance = (id: number, data: any) => api.put(`/finance/${id}`, data);
+
+export const deleteCustomer = (id: number) => api.delete(`/customers/${id}`);
+export const updateCustomer = (id: number, data: any) => api.put(`/customers/${id}`, data);

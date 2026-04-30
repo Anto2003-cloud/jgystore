@@ -27,3 +27,21 @@ def create_customer(obj_in: CustomerCreate, db: Session = Depends(get_db)):
 @router.get("/")
 def get_customers(db: Session = Depends(get_db)):
     return db.query(Customer).all()
+
+@router.delete("/{id}")
+def delete_customer(id: int, db: Session = Depends(get_db)):
+    db_cust = db.query(Customer).filter(Customer.id == id).first()
+    if not db_cust: raise HTTPException(status_code=404, detail="No encontrado")
+    db.delete(db_cust)
+    db.commit()
+    return {"message": "Cliente eliminado"}
+
+@router.put("/{id}")
+def update_customer(id: int, customer_in: CustomerCreate, db: Session = Depends(get_db)):
+    db_cust = db.query(Customer).filter(Customer.id == id).first()
+    if not db_cust: raise HTTPException(status_code=404, detail="No encontrado")
+    db_cust.full_name = customer_in.full_name
+    db_cust.phone = customer_in.phone
+    db_cust.email = customer_in.email
+    db.commit()
+    return db_cust
