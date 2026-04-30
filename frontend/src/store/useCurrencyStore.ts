@@ -1,17 +1,19 @@
 import { create } from 'zustand';
 
 interface CurrencyState {
-  rate: number;
+  rate: number;      // Tasa USD
+  eurRate: number;   // Tasa EUR
   currency: 'USD' | 'VES';
-  setRate: (rate: number) => void;
+  setRates: (usd: number, eur: number) => void;
   toggleCurrency: () => void;
   formatPrice: (priceUsd: number) => string;
 }
 
 export const useCurrencyStore = create<CurrencyState>((set, get) => ({
-  rate: 1, // Este valor lo actualizaremos luego con tu API
+  rate: 486.20,
+  eurRate: 525.09,
   currency: 'USD',
-  setRate: (rate) => set({ rate }),
+  setRates: (usd, eur) => set({ rate: usd, eurRate: eur }),
   toggleCurrency: () => set((state) => ({ 
     currency: state.currency === 'USD' ? 'VES' : 'USD' 
   })),
