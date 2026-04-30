@@ -10,13 +10,20 @@ interface CurrencyState {
 }
 
 export const useCurrencyStore = create<CurrencyState>((set, get) => ({
-  rate: 486.20,
-  eurRate: 525.09,
+  // VALORES INICIALES ACTUALIZADOS SEGÚN BCV REAL
+  rate: 487.11,
+  eurRate: 569.76,
   currency: 'USD',
+
+  // Actualiza ambas tasas al recibir datos de la API
   setRates: (usd, eur) => set({ rate: usd, eurRate: eur }),
+
+  // Cambia entre $ y Bs.
   toggleCurrency: () => set((state) => ({ 
     currency: state.currency === 'USD' ? 'VES' : 'USD' 
   })),
+
+  // Formateador de moneda dinámico
   formatPrice: (priceUsd: number) => {
     const { currency, rate } = get();
     if (currency === 'VES') {

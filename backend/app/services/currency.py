@@ -7,25 +7,27 @@ from datetime import datetime
 class CurrencyService:
     @staticmethod
     async def fetch_bcv_rates():
-        """Scraper con User-Agent real para evitar bloqueos."""
+        """Scraper ultra-resistente con User-Agent de navegador real."""
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
         try:
             async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
                 response = await client.get("https://www.bcv.org.ve/", headers=headers, follow_redirects=True)
-                if response.status_code != 200: return None
+                if response.status_code != 200:
+                    return None
                 
                 soup = BeautifulSoup(response.text, "html.parser")
                 
-                def get_value(div_id):
-                    element = soup.find("div", {"id": div_id})
-                    if element and element.find("strong"):
-                        return float(element.find("strong").text.strip().replace(",", "."))
+                # Función interna para extraer valores limpiamente
+                def get_val(id_name):
+                    el = soup.find("div", {"id": id_name})
+                    if el and el.find("strong"):
+                        return float(el.find("strong").text.strip().replace(",", "."))
                     return None
 
-                usd = get_value("dolar")
-                eur = get_value("euro")
+                usd = get_val("dolar")
+                eur = get_val("euro")
 
                 if usd and eur:
                     return {"USD": usd, "EUR": eur}
@@ -36,15 +38,16 @@ class CurrencyService:
 
     @staticmethod
     async def sync_rates_db(db: Session):
-        """Limpia registros viejos y guarda los nuevos."""
+        """Limpia la base de datos y guarda las tasas mas recientes."""
         rates = await CurrencyService.fetch_bcv_rates()
         
-        # SI EL SCRAPER FALLA, USAMOS LOS DATOS DE TU FOTO (Prioridad)
+        # PRIORIDAD: Si el scraper falla, usamos los valores de tu captura
         if not rates:
             rates = {"USD": 487.11, "EUR": 569.76}
+            print("⚠️ Scraper falló. Usando valores de respaldo: 487.11 / 569.76")
 
         try:
-            # LIMPIEZA TOTAL: Borramos todo lo anterior para evitar basura
+            # LIMPIEZA TOTAL: Evitamos que el sistema lea registros viejos (como el 486.20)
             db.query(ExchangeRate).delete()
             
             for curr, val in rates.items():
@@ -55,15 +58,17 @@ class CurrencyService:
                     updated_at=datetime.utcnow()
                 )
                 db.add(new_rate)
+            
             db.commit()
             return rates
         except Exception as e:
             db.rollback()
+            print(f"Error DB: {e}")
             return None
 
     @staticmethod
     def get_rate(db: Session, currency: str = "USD") -> float:
-        """Obtiene la tasa de la DB o usa fallbacks de la foto real."""
+        """Obtiene la tasa de la base de datos o usa el fallback de la foto."""
         try:
             rate_obj = db.query(ExchangeRate).filter(
                 ExchangeRate.currency == currency
@@ -74,5 +79,5 @@ class CurrencyService:
         except:
             pass
         
-        # --- VALORES REALES DE TU CAPTURA (30 Abril 2026) ---
+        # VALORES OFICIALES DE TU CAPTURA (30 ABRIL 2026)
         return 487.11 if currency == "USD" else 569.76
