@@ -20,35 +20,44 @@ const menuItems = [
 export const Sidebar = () => {
   const pathname = usePathname();
   const router = useRouter();
-  const { rate, eurRate } = useCurrencyStore(); // Traemos AMBAS tasas reales
+  const { rate, eurRate } = useCurrencyStore(); 
 
   const handleLogout = () => {
     document.cookie = "auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     router.push('/login');
-    router.refresh();
+    // Forzamos recarga para limpiar el estado de la App
+    setTimeout(() => window.location.reload(), 100);
   };
 
   return (
     <aside className="w-64 bg-slate-950 text-white h-screen flex flex-col fixed left-0 top-0 shadow-2xl z-50">
+      {/* Logo y Branding */}
       <div className="p-8 flex flex-col items-center border-b border-slate-800">
         <div className="mb-4 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">
-          <img src="/logo-jgy.png" alt="Logo" className="w-16 h-16 object-contain" />
+          <img src="/logo-jgy.png" alt="Logo Jgystore" className="w-16 h-16 object-contain" />
         </div>
         <h2 className="text-xl font-bold tracking-tighter uppercase italic">JGYSTORE</h2>
         <span className="text-[10px] text-emerald-500 font-bold uppercase">Sport Ecosystem</span>
       </div>
 
-      <nav className="flex-1 p-4 space-y-2 mt-4 overflow-y-auto">
+      {/* Navegación */}
+      <nav className="flex-1 p-4 space-y-2 mt-4 overflow-y-auto custom-scrollbar">
         {menuItems.map((item) => (
-          <Link key={item.path} href={item.path}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-              pathname === item.path ? "bg-emerald-500 text-black font-bold" : "text-slate-400 hover:text-white"
-            }`}>
+          <Link 
+            key={item.path} 
+            href={item.path}
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              pathname === item.path 
+              ? "bg-emerald-500 text-black font-bold shadow-lg shadow-emerald-500/20" 
+              : "text-slate-400 hover:bg-slate-900 hover:text-white"
+            }`}
+          >
             {item.icon} <span className="text-sm">{item.name}</span>
           </Link>
         ))}
       </nav>
 
+      {/* Footer: Tasas Dinámicas */}
       <div className="p-6 border-t border-slate-800 bg-slate-900/50 space-y-3">
         <div className="flex justify-between items-center text-[10px]">
           <span className="text-slate-400 uppercase font-bold tracking-wider">BCV USD</span>
@@ -60,12 +69,14 @@ export const Sidebar = () => {
         <div className="flex justify-between items-center text-[10px] pb-3">
           <span className="text-slate-400 uppercase font-bold tracking-wider">BCV EUR</span>
           <span className="text-blue-400 font-mono font-bold text-sm">
-            {/* AQUÍ YA NO HAY MULTIPLICACIÓN, ES EL VALOR REAL DE LA DB */}
             {eurRate > 1 ? `${eurRate.toFixed(2)} Bs.` : "---"}
           </span>
         </div>
         
-        <button onClick={handleLogout} className="flex items-center gap-3 text-slate-400 hover:text-red-400 text-sm w-full p-2 rounded-lg hover:bg-slate-900 border-t border-slate-800 pt-4">
+        <button 
+          onClick={handleLogout} 
+          className="flex items-center gap-3 text-slate-400 hover:text-red-400 text-sm w-full p-2 rounded-lg hover:bg-slate-900 border-t border-slate-800 pt-4 transition-colors"
+        >
           <LogOut size={18}/> <span className="font-medium">Cerrar Sesión</span>
         </button>
       </div>
