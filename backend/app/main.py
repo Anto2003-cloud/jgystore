@@ -10,7 +10,6 @@ from app.api.v1.endpoints import auth, products, sales, dashboard, finance, orde
 
 Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Jgystore ERP")
-
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
@@ -36,6 +35,7 @@ def startup_event():
     scheduler = BackgroundScheduler()
     scheduler.add_job(update_currency_task, 'interval', minutes=30)
     scheduler.start()
+    # Ejecución inmediata en hilo separado
     threading.Thread(target=update_currency_task).start()
 
 @app.get("/")
