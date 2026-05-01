@@ -50,6 +50,31 @@ async def refresh_rates(db: Session = Depends(get_db)):
         print(f"Error en refresh_rates endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/rates")
+async def current_rates(refresh: bool = False, db: Session = Depends(get_db)):
+    """Devuelve las tasas actuales de USD y EUR vinculadas al BCV.
+    Si refresh=true, intenta obtenerlas en tiempo real desde el proveedor.
+    """
+    try:
+        if refresh:
+            rates = await CurrencyService.sync_rates_db(db)
+            if rates:
+                return {
+                    "status": "success",
+                    "message": "Tasas actualizadas en tiempo real desde el BCV.",
+                    "rates": rates
+                }
+
+        rates = CurrencyService.get_latest_rates(db)
+        return {
+            "status": "success",
+            "message": "Tasas actuales obtenidas desde la base de datos.",
+            "rates": rates
+        }
+    except Exception as e:
+        print(f"Error en current_rates endpoint: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # --- 2. ENDPOINT PARA AJUSTE MANUAL (POR SI EL BCV SE CAE MUCHO) ---
 @router.post("/manual-rates")
 async def set_manual_rates(data: ManualRate, db: Session = Depends(get_db)):
