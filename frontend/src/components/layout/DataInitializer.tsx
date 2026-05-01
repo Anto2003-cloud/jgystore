@@ -4,7 +4,7 @@ import { useCurrencyStore } from "../../store/useCurrencyStore";
 import api from "../../services/api";
 
 export const DataInitializer = () => {
-  const setRates = useCurrencyStore((state) => state.setRates);
+  const { setRates, rate } = useCurrencyStore();
 
   useEffect(() => {
     const initApp = async () => {
@@ -12,13 +12,22 @@ export const DataInitializer = () => {
         const response = await api.get("/dashboard/");
         if (response.data && response.data.rates) {
           const { USD, EUR } = response.data.rates;
-          setRates(USD, EUR);
+          
+          if (USD > 10) {
+            console.log("✅ Tasas sincronizadas:", { USD, EUR });
+            setRates(USD, EUR);
+          } else {
+            // Si el servidor mandó 0 o 1, reintentamos en 3 segundos
+            console.log("⏳ Tasa aún no lista, reintentando...");
+            setTimeout(initApp, 3000);
+          }
         }
-      } catch (e) { console.error("Sync Error"); }
+      } catch (e) {
+        console.error("Error de conexión");
+      }
     };
+
     initApp();
-    const interval = setInterval(initApp, 10 * 60 * 1000);
-    return () => clearInterval(interval);
   }, [setRates]);
 
   return null;
