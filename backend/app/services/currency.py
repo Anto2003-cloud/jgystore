@@ -7,68 +7,84 @@ class CurrencyService:
     @staticmethod
     async def fetch_bcv_rates():
         """
-        Obtiene la tasa REAL del BCV de hoy usando CriptoDolar API.
-        Esta fuente es 100% compatible con Render y no se bloquea.
+        Consulta 3 fuentes distintas para asegurar la tasa real del BCV.
+        Si una falla o es bloqueada, salta a la siguiente automáticamente.
         """
-        # Endpoints específicos para USD y EUR oficiales del BCV
-        url_usd = "https://api.criptodolar.com/v1/quotes/usd?provider=bcv"
-        url_eur = "https://api.criptodolar.com/v1/quotes/eur?provider=bcv"
+        # Lista de proveedores profesionales de tasas BCV
+        sources = [
+            {"name": "PyDolarVE", "url": "https://pydolarve.org/api/v1/dollar?page=bcv"},
+            {"name": "DolarAPI", "url": "https://ve.dolarapi.com/v1/dolares/bcv"},
+            {"name": "CriptoDolar", "url": "https://api.criptodolar.com/v1/quotes/usd?provider=bcv"}
+        ]
         
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                print(">>> [SINCRO] Conectando con fuente oficial del BCV...")
-                
-                res_usd = await client.get(url_usd)
-                res_eur = await client.get(url_eur)
-
-                if res_usd.status_code == 200 and res_eur.status_code == 200:
-                    # La API devuelve una lista, tomamos el primer elemento [0]
-                    usd_val = float(res_usd.json()[0]['price'])
-                    eur_val = float(res_eur.json()[0]['price'])
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            for source in sources:
+                try:
+                    print(f">>> [SINCRO] Intentando con {source['name']}...")
+                    response = await client.get(source['url'])
                     
-                    print(f"✅ TASAS CAPTURADAS: USD {usd_val} | EUR {eur_val}")
-                    return {"USD": usd_val, "EUR": eur_val}
-                
-                print(f"❌ Error de respuesta: USD:{res_usd.status_code} EUR:{res_eur.status_code}")
-                return None
-        except Exception as e:
-            print(f"❌ Error de conexión con el proveedor: {e}")
-            return None
+                    if response.status_code == 200:
+                        data = response.json()
+                        usd, eur = 0.0, 0.0
+
+                        # Lógica según la estructura de cada proveedor
+                        if source['name'] == "PyDolarVE":
+                            usd = float(data['monitors']['usd']['price'])
+                            eur = float(data['monitors']['eur']['price'])
+                        
+                        elif source['name'] == "DolarAPI":
+                            usd = float(data['promedio'])
+                            # Buscamos el euro en su otro endpoint
+                            e_res = await client.get("https://ve.dolarapi.com/v1/euros/bcv")
+                            eur = float(e_res.json()['promedio']) if e_res.status_code == 200 else usd * 1.08
+                        
+                        elif source['name'] == "CriptoDolar":
+                            # Esta API devuelve una lista
+                            usd = float(data[0]['price'])
+                            e_res = await client.get("https://api.criptodolar.com/v1/quotes/eur?provider=bcv")
+                            eur = float(e_res.json()[0]['price']) if e_res.status_code == 200 else usd * 1.08
+
+                        if usd > 10: # Validación básica de que la tasa es real
+                            print(f"✅ ÉXITO CON {source['name']}: USD {usd} | EUR {eur}")
+                            return {"USD": usd, "EUR": eur}
+                            
+                except Exception as e:
+                    print(f"⚠️ Fuente {source['name']} falló: {str(e)}")
+                    continue # Probar la siguiente fuente
+                    
+        return None
 
     @staticmethod
     async def sync_rates_db(db: Session):
-        """Limpia la base de datos y guarda los valores reales de hoy."""
+        """Sincronización atómica: Limpia la DB y guarda lo nuevo."""
         rates = await CurrencyService.fetch_bcv_rates()
-        
         if not rates:
+            print("❌ ERROR: Ninguna fuente respondió. Revisa la conexión de Render.")
             return None
 
         try:
-            # Borramos registros viejos para que no haya basura de días anteriores
+            # Borramos registros viejos para que no haya confusión de precios
             db.query(ExchangeRate).delete()
             
             for curr, val in rates.items():
-                new_rate = ExchangeRate(
+                db.add(ExchangeRate(
                     currency=curr, 
                     rate=val, 
-                    source="BCV_OFICIAL",
+                    source="BCV_REALTTIME",
                     updated_at=datetime.utcnow()
-                )
-                db.add(new_rate)
-            
+                ))
             db.commit()
             return rates
         except Exception as e:
             db.rollback()
-            print(f"Error al guardar en Neon: {e}")
+            print(f"Error guardando en Neon: {e}")
             return None
 
     @staticmethod
     def get_rate(db: Session, currency: str = "USD") -> float:
-        """Extrae el valor más reciente guardado en la base de datos."""
+        """Obtiene la tasa de la DB. Si está vacía devuelve 1.0."""
         rate_obj = db.query(ExchangeRate).filter(
             ExchangeRate.currency == currency
         ).order_by(ExchangeRate.updated_at.desc()).first()
         
-        # Si no hay nada en la DB, devuelve 1.0 (para que notes que falta sync)
         return float(rate_obj.rate) if rate_obj else 1.0
