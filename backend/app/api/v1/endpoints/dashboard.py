@@ -15,92 +15,51 @@ def get_db():
     finally:
         db.close()
 
-# Esquema simple para el ajuste manual (opcional para el futuro)
-class ManualRate(BaseModel):
-    usd: float
-    eur: float
-
-# --- 1. ENDPOINT PARA REFRESCAR TASAS (SOLUCIONA EL ERROR 404) ---
+# --- 1. ENDPOINT DE RESCATE (AUTOMÁTICO) ---
 @router.post("/refresh-rates")
 async def refresh_rates(db: Session = Depends(get_db)):
     """
-    Este endpoint es llamado por el botón del Sidebar.
-    Intenta conectar al BCV y devuelve las tasas actualizadas.
+    Este es el comando de 'Fuerza Bruta'. 
+    Si el Frontend ve que las tasas están en 0, llama aquí.
+    El Backend probará las 3 fuentes (Amazon, GitHub, Global) hasta obtener la real.
     """
     try:
-        print(">>> Solicitud manual de actualización de tasas recibida...")
+        print(">>> [RESCATE] Iniciando búsqueda de tasas en fuentes redundantes...")
         rates = await CurrencyService.sync_rates_db(db)
         
         if rates:
             return {
                 "status": "success",
-                "message": "Tasas sincronizadas exitosamente con el BCV",
+                "message": "Tasas actualizadas desde fuentes en tiempo real",
                 "rates": rates
             }
         else:
-            # Si el scraper falla, devolvemos los últimos valores guardados
-            usd = CurrencyService.get_rate(db, "USD")
-            eur = CurrencyService.get_rate(db, "EUR")
-            return {
-                "status": "warning",
-                "message": "El BCV no respondió. Usando última tasa conocida.",
-                "rates": {"USD": usd, "EUR": eur}
-            }
+            raise HTTPException(
+                status_code=503, 
+                detail="No se pudo conectar con ninguna fuente oficial en este momento."
+            )
     except Exception as e:
-        print(f"Error en refresh_rates endpoint: {e}")
+        print(f"Error en refresh_rates: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/rates")
-async def current_rates(refresh: bool = False, db: Session = Depends(get_db)):
-    """Devuelve las tasas actuales de USD y EUR vinculadas al BCV.
-    Si refresh=true, intenta obtenerlas en tiempo real desde el proveedor.
-    """
-    try:
-        if refresh:
-            rates = await CurrencyService.sync_rates_db(db)
-            if rates:
-                return {
-                    "status": "success",
-                    "message": "Tasas actualizadas en tiempo real desde el BCV.",
-                    "rates": rates
-                }
-
-        rates = CurrencyService.get_latest_rates(db)
-        return {
-            "status": "success",
-            "message": "Tasas actuales obtenidas desde la base de datos.",
-            "rates": rates
-        }
-    except Exception as e:
-        print(f"Error en current_rates endpoint: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# --- 2. ENDPOINT PARA AJUSTE MANUAL (POR SI EL BCV SE CAE MUCHO) ---
-@router.post("/manual-rates")
-async def set_manual_rates(data: ManualRate, db: Session = Depends(get_db)):
-    """Permite al dueño de la empresa escribir el precio a mano."""
-    try:
-        from app.models.models import ExchangeRate
-        from datetime import datetime
-        
-        # Limpiamos tasas anteriores
-        db.query(ExchangeRate).delete()
-        
-        # Creamos los nuevos registros manuales
-        new_usd = ExchangeRate(currency="USD", rate=data.usd, source="Manual", updated_at=datetime.utcnow())
-        new_eur = ExchangeRate(currency="EUR", rate=data.eur, source="Manual", updated_at=datetime.utcnow())
-        
-        db.add(new_usd)
-        db.add(new_eur)
-        db.commit()
-        
-        return {"message": "Tasas ajustadas manualmente", "rates": {"USD": data.usd, "EUR": data.eur}}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-
-# --- 3. ENDPOINT PRINCIPAL DEL DASHBOARD ---
+# --- 2. ENDPOINT PRINCIPAL (EL QUE USA EL INITIALIZER) ---
 @router.get("/")
-def get_dashboard(db: Session = Depends(get_db)):
-    """Devuelve todas las métricas financieras y de stock."""
+async def get_dashboard(db: Session = Depends(get_db)):
+    """
+    Devuelve el Dashboard completo. 
+    Incluye el objeto 'rates' con los valores REALES de la base de datos.
+    """
+    # Llamamos al CRUD que ya configuramos para que no use valores manuales
     return crud_dashboard.get_dashboard_metrics(db)
+
+# --- 3. CONSULTA RÁPIDA DE TASAS ---
+@router.get("/rates")
+def get_only_rates(db: Session = Depends(get_db)):
+    """Devuelve solo las tasas actuales de la DB."""
+    usd = CurrencyService.get_rate(db, "USD")
+    eur = CurrencyService.get_rate(db, "EUR")
+    return {
+        "USD": usd,
+        "EUR": eur,
+        "last_sync": "Real-time"
+    }

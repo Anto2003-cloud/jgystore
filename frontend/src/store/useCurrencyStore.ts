@@ -18,7 +18,7 @@ export const useCurrencyStore = create<CurrencyState>((set, get) => ({
   formatPrice: (priceUsd: number) => {
     const { currency, rate } = get();
     if (currency === 'VES') {
-      return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'VES' }).format(priceUsd * rate);
+      return new Intl.NumberFormat('es-VE', { style: 'currency', currency: 'VES' }).format(priceUsd * (rate || 1));
     }
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(priceUsd);
   },
