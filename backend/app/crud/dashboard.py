@@ -1,17 +1,18 @@
-# backend/app/crud/dashboard.py
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models.models import Sale, SaleItem, Product, ProductVariation, ExchangeRate, FinanceTransaction
-from app.services.currency import CurrencyService # Importamos el servicio central
 
 def get_dashboard_metrics(db: Session):
     try:
-        # 1. Obtener tasas REALES del servicio central (Aquí está la clave)
-        # Esto asegura que Dashboard y Sidebar hablen el mismo idioma
-        current_usd = CurrencyService.get_rate(db, "USD")
-        current_eur = CurrencyService.get_rate(db, "EUR")
+        # 1. Buscar las tasas reales guardadas por el Scraper
+        usd_rate_obj = db.query(ExchangeRate).filter(ExchangeRate.currency == "USD").order_by(ExchangeRate.updated_at.desc()).first()
+        eur_rate_obj = db.query(ExchangeRate).filter(ExchangeRate.currency == "EUR").order_by(ExchangeRate.updated_at.desc()).first()
+        
+        # Si existen en DB las usamos, sino el valor de hoy
+        current_usd = float(usd_rate_obj.rate) if usd_rate_obj else 489.55
+        current_eur = float(eur_rate_obj.rate) if eur_rate_obj else 528.71
 
-        # 2. Cálculos financieros
+        # 2. Datos de Ventas y Costos
         financials_raw = db.query(
             func.sum(SaleItem.quantity * SaleItem.unit_price_usd),
             func.sum(SaleItem.quantity * SaleItem.unit_cost_at_sale)
@@ -20,6 +21,7 @@ def get_dashboard_metrics(db: Session):
         rev = float(financials_raw[0] or 0.0)
         cost = float(financials_raw[1] or 0.0)
         
+        # 3. Gastos
         total_expenses = db.query(func.sum(FinanceTransaction.amount_usd)).filter(
             FinanceTransaction.type == "GASTO"
         ).scalar() or 0.0
@@ -28,7 +30,7 @@ def get_dashboard_metrics(db: Session):
         margin = (net_profit / rev * 100) if rev > 0 else 0.0
 
         return {
-            "best_sellers": [],
+            "best_sellers": [], 
             "low_stock": [],
             "financials": {
                 "total_revenue_usd": round(rev, 2),
@@ -45,13 +47,9 @@ def get_dashboard_metrics(db: Session):
         }
     except Exception as e:
         print(f"Error en Dashboard: {e}")
-        # En caso de error extremo, pedimos las tasas al servicio, no las inventamos aquí
         return {
             "best_sellers": [], "low_stock": [],
             "financials": {"total_revenue_usd": 0, "total_cost_usd": 0, "total_expenses_usd": 0, "net_profit_usd": 0, "margin_percentage": 0},
-            "rates": {
-                "USD": CurrencyService.get_rate(db, "USD"),
-                "EUR": CurrencyService.get_rate(db, "EUR")
-            },
-            "rate_used": CurrencyService.get_rate(db, "USD")
+            "rates": {"USD": 489.55, "EUR": 528.71}, 
+            "rate_used": 489.55
         }

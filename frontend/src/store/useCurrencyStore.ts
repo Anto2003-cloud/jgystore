@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 
 interface CurrencyState {
-  rate: number;      // Tasa USD
-  eurRate: number;   // Tasa EUR
+  rate: number;
+  eurRate: number;
   currency: 'USD' | 'VES';
   setRates: (usd: number, eur: number) => void;
   toggleCurrency: () => void;
@@ -10,20 +10,13 @@ interface CurrencyState {
 }
 
 export const useCurrencyStore = create<CurrencyState>((set, get) => ({
-  // VALORES INICIALES ACTUALIZADOS SEGÚN BCV REAL
-  rate: 487.11,
-  eurRate: 569.76,
+  rate: 489.55,
+  eurRate: 528.71,
   currency: 'USD',
-
-  // Actualiza ambas tasas al recibir datos de la API
   setRates: (usd, eur) => set({ rate: usd, eurRate: eur }),
-
-  // Cambia entre $ y Bs.
   toggleCurrency: () => set((state) => ({ 
     currency: state.currency === 'USD' ? 'VES' : 'USD' 
   })),
-
-  // Formateador de moneda dinámico
   formatPrice: (priceUsd: number) => {
     const { currency, rate } = get();
     if (currency === 'VES') {
