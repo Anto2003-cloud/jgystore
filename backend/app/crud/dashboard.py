@@ -1,16 +1,29 @@
-# backend/app/crud/dashboard.py
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models.models import Sale, SaleItem, Product, ProductVariation, ExchangeRate, FinanceTransaction
 from app.services.currency import CurrencyService
+import asyncio
 
 def get_dashboard_metrics(db: Session):
     try:
-        # 1. Obtener tasas REALES del motor de Amazon
+        # 1. INTENTO DE RESCATE: Si no hay tasas o son 1.0, forzamos sincronización YA
+        usd_check = CurrencyService.get_rate(db, "USD")
+        if usd_check <= 1.1:
+            print(">>> [DASHBOARD] Detectada tasa vacía. Forzando sincronización inmediata...")
+            try:
+                # Ejecutamos el scraper síncronamente para esta petición
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(CurrencyService.sync_rates_db(db))
+                loop.close()
+            except Exception as e:
+                print(f"Error en sincronización forzada: {e}")
+
+        # 2. Ahora sí, leemos lo que hay en DB
         current_usd = CurrencyService.get_rate(db, "USD")
         current_eur = CurrencyService.get_rate(db, "EUR")
 
-        # 2. Cálculos financieros básicos
+        # 3. Cálculos financieros (Ventas y Costos)
         financials_raw = db.query(
             func.sum(SaleItem.quantity * SaleItem.unit_price_usd),
             func.sum(SaleItem.quantity * SaleItem.unit_cost_at_sale)
@@ -47,6 +60,5 @@ def get_dashboard_metrics(db: Session):
         return {
             "best_sellers": [], "low_stock": [],
             "financials": {"total_revenue_usd": 0, "total_cost_usd": 0, "total_expenses_usd": 0, "net_profit_usd": 0, "margin_percentage": 0},
-            "rates": {"USD": 1.0, "EUR": 1.0}, 
-            "rate_used": 1.0
+            "rates": {"USD": 1.0, "EUR": 1.0}, "rate_used": 1.0
         }
