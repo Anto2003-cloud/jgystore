@@ -1,4 +1,5 @@
 import httpx
+from bs4 import BeautifulSoup
 from sqlalchemy.orm import Session
 from app.models.models import ExchangeRate
 from datetime import datetime
@@ -6,55 +7,62 @@ from datetime import datetime
 class CurrencyService:
     @staticmethod
     async def fetch_bcv_rates():
-        """
-        Conecta con DolarAPI (Mirror oficial del BCV) 
-        para obtener tasas reales sin bloqueos de IP.
-        """
+        """Scraper que imita a un usuario real para saltar bloqueos."""
+        # Estas cabeceras son vitales para que el BCV no nos detecte como robot
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "es-VE,es-ES;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Referer": "https://www.google.com/",
+            "Connection": "keep-alive"
+        }
+        
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                # 1. Obtenemos el Dólar
-                usd_res = await client.get("https://ve.dolarapi.com/v1/dolares/bcv")
-                # 2. Obtenemos el Euro
-                eur_res = await client.get("https://ve.dolarapi.com/v1/euros/bcv")
+            async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
+                print(">>> INTENTANDO CONEXIÓN CON BCV.ORG.VE...")
+                response = await client.get("https://www.bcv.org.ve/", headers=headers, follow_redirects=True)
                 
-                if usd_res.status_code == 200 and eur_res.status_code == 200:
-                    usd_data = usd_res.json()
-                    eur_data = eur_res.json()
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.text, "html.parser")
                     
-                    # Extraemos el valor de 'promedio' o 'venta' que son iguales en BCV
-                    usd_val = float(usd_data['promedio'])
-                    eur_val = float(eur_data['promedio'])
+                    # Buscamos con selectores CSS precisos
+                    usd_el = soup.select_one("#dolar strong")
+                    eur_el = soup.select_one("#euro strong")
                     
-                    print(f"✅ TASAS RECUPERADAS (DolarAPI): USD {usd_val} | EUR {eur_val}")
-                    return {"USD": usd_val, "EUR": eur_val}
+                    if usd_el and eur_el:
+                        usd = float(usd_el.text.strip().replace(",", "."))
+                        eur = float(eur_el.text.strip().replace(",", "."))
+                        print(f"✅ EXTRACCIÓN EXITOSA: USD {usd} | EUR {eur}")
+                        return {"USD": usd, "EUR": eur}
+                    
+                    print("❌ No se encontraron los IDs 'dolar' o 'euro' en el HTML")
+                else:
+                    print(f"❌ El BCV rechazó la conexión. Código: {response.status_code}")
                 
-                print(f"❌ Error en DolarAPI: Status {usd_res.status_code}")
                 return None
         except Exception as e:
-            print(f"❌ Fallo de conexión con el proveedor de tasas: {e}")
+            print(f"❌ Error de red con el BCV: {str(e)}")
             return None
 
     @staticmethod
     async def sync_rates_db(db: Session):
-        """Limpia y sincroniza la DB con los valores reales del momento."""
+        """Limpia la base de datos y guarda los valores frescos."""
         rates = await CurrencyService.fetch_bcv_rates()
-        
         if not rates:
             return None
 
         try:
-            # Borramos registros para que solo existan los 2 del dia
+            # Borramos registros viejos para forzar la actualización
             db.query(ExchangeRate).delete()
             
             for curr, val in rates.items():
                 new_rate = ExchangeRate(
                     currency=curr, 
                     rate=val, 
-                    source="BCV (via DolarAPI)",
+                    source="BCV_OFFICIAL",
                     updated_at=datetime.utcnow()
                 )
                 db.add(new_rate)
-            
             db.commit()
             return rates
         except Exception as e:
@@ -64,21 +72,10 @@ class CurrencyService:
 
     @staticmethod
     def get_rate(db: Session, currency: str = "USD") -> float:
-        """Obtiene la tasa de la DB."""
+        """Obtiene el valor real de la base de datos."""
         rate_obj = db.query(ExchangeRate).filter(
             ExchangeRate.currency == currency
         ).order_by(ExchangeRate.updated_at.desc()).first()
         
-        if rate_obj:
-            return float(rate_obj.rate)
-        
-        # Fallback de seguridad (solo si la DB esta vacia)
-        return 487.11 if currency == "USD" else 569.76
-
-    @staticmethod
-    def get_latest_rates(db: Session) -> dict:
-        """Retorna las últimas tasas USD y EUR desde la base de datos."""
-        return {
-            "USD": CurrencyService.get_rate(db, "USD"),
-            "EUR": CurrencyService.get_rate(db, "EUR"),
-        }
+        # Si hay valor en DB lo usamos, si no, devolvemos 1.0 para notar el fallo
+        return float(rate_obj.rate) if rate_obj else 1.0
