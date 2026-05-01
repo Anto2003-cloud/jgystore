@@ -4,6 +4,7 @@ from app.models.models import Sale, SaleItem, Product, ProductVariation, Exchang
 from app.services.currency import CurrencyService
 
 def get_dashboard_metrics(db: Session):
+    # Obtener tasas del servicio central para consistencia total
     current_usd = CurrencyService.get_rate(db, "USD")
     current_eur = CurrencyService.get_rate(db, "EUR")
 

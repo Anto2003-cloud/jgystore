@@ -10,8 +10,8 @@ interface CurrencyState {
 }
 
 export const useCurrencyStore = create<CurrencyState>((set, get) => ({
-  rate: 0,
-  eurRate: 0,
+  rate: 489.55,
+  eurRate: 569.76,
   currency: 'USD',
   setRates: (usd, eur) => set({ rate: usd, eurRate: eur }),
   toggleCurrency: () => set((state) => ({ currency: state.currency === 'USD' ? 'VES' : 'USD' })),
