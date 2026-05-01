@@ -6,11 +6,11 @@ from app.services.currency import CurrencyService
 
 def get_dashboard_metrics(db: Session):
     try:
-        # 1. Obtener tasas REALES del servidor (Cero números manuales aquí)
+        # 1. Obtener tasas REALES del motor de Amazon
         current_usd = CurrencyService.get_rate(db, "USD")
         current_eur = CurrencyService.get_rate(db, "EUR")
 
-        # 2. Cálculos financieros
+        # 2. Cálculos financieros básicos
         financials_raw = db.query(
             func.sum(SaleItem.quantity * SaleItem.unit_price_usd),
             func.sum(SaleItem.quantity * SaleItem.unit_cost_at_sale)
@@ -27,7 +27,7 @@ def get_dashboard_metrics(db: Session):
         margin = (net_profit / rev * 100) if rev > 0 else 0.0
 
         return {
-            "best_sellers": [],
+            "best_sellers": [], 
             "low_stock": [],
             "financials": {
                 "total_revenue_usd": round(rev, 2),
@@ -43,13 +43,10 @@ def get_dashboard_metrics(db: Session):
             "rate_used": current_usd
         }
     except Exception as e:
-        print(f"Error en Dashboard: {e}")
+        print(f"Error Crítico Dashboard: {e}")
         return {
             "best_sellers": [], "low_stock": [],
             "financials": {"total_revenue_usd": 0, "total_cost_usd": 0, "total_expenses_usd": 0, "net_profit_usd": 0, "margin_percentage": 0},
-            "rates": {
-                "USD": CurrencyService.get_rate(db, "USD"),
-                "EUR": CurrencyService.get_rate(db, "EUR")
-            },
-            "rate_used": CurrencyService.get_rate(db, "USD")
+            "rates": {"USD": 1.0, "EUR": 1.0}, 
+            "rate_used": 1.0
         }
