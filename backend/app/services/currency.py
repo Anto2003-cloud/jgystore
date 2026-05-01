@@ -63,11 +63,22 @@ class CurrencyService:
             return None
 
     @staticmethod
-    def get_rate(db: Session, currency: str = "USD") -> float:
-        """Obtiene la tasa de la base de datos sin números manuales."""
-        rate_obj = db.query(ExchangeRate).filter(
-            ExchangeRate.currency == currency
-        ).order_by(ExchangeRate.updated_at.desc()).first()
-        
-        # Si no hay nada en la DB, devuelve 1.0 para forzar el aviso visual
-        return float(rate_obj.rate) if rate_obj else 1.0
+    async def fetch_bcv_rates():
+        """Consulta el espejo oficial de Amazon (AWS) para tasas BCV."""
+        url = "https://s3.amazonaws.com/dolartoday/data.json"
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                response = await client.get(url)
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    # 'bcv' es el dólar oficial, 'eur' -> 'bcv' es el euro oficial
+                    usd = float(data['usd']['bcv'])
+                    eur = float(data['eur']['bcv']) # <--- VALOR REAL DEL BANCO
+                    
+                    print(f"✅ EXTRACCIÓN EXITOSA: USD {usd} | EUR {eur}")
+                    return {"USD": usd, "EUR": eur}
+                return None
+        except Exception as e:
+            print(f"Error en Scraper: {e}")
+            return None
