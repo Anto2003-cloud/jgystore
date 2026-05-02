@@ -8,10 +8,21 @@ from app.models.models import Base
 from app.services.currency import CurrencyService
 from app.api.v1.endpoints import auth, products, sales, dashboard, finance, orders, customers
 
+# Crear tablas
 Base.metadata.create_all(bind=engine)
-app = FastAPI(title="Jgystore ERP")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+app = FastAPI(title="Jgystore API")
+
+# ESTO ES LO QUE PERMITE QUE VERCEL VEA LOS DATOS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Permitir todo para que no falle el acceso
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Rutas
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(products.router, prefix="/api/v1/products", tags=["Inventory"])
 app.include_router(sales.router, prefix="/api/v1/sales", tags=["Sales"])
@@ -35,7 +46,6 @@ def startup_event():
     scheduler = BackgroundScheduler()
     scheduler.add_job(update_currency_task, 'interval', minutes=30)
     scheduler.start()
-    # Ejecución inmediata en hilo separado
     threading.Thread(target=update_currency_task).start()
 
 @app.get("/")
