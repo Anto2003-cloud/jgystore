@@ -1,13 +1,15 @@
+# backend/app/crud/dashboard.py
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.models.models import Sale, SaleItem, Product, ProductVariation, ExchangeRate, FinanceTransaction
 from app.services.currency import CurrencyService
 
 def get_dashboard_metrics(db: Session):
-    # Obtener tasas del servicio central para consistencia total
+    # 1. Obtenemos tasas REALES (Cero números manuales)
     current_usd = CurrencyService.get_rate(db, "USD")
     current_eur = CurrencyService.get_rate(db, "EUR")
 
+    # 2. Cálculos financieros (Ventas y Gastos)
     financials_raw = db.query(
         func.sum(SaleItem.quantity * SaleItem.unit_price_usd),
         func.sum(SaleItem.quantity * SaleItem.unit_cost_at_sale)
@@ -20,7 +22,8 @@ def get_dashboard_metrics(db: Session):
     net_profit = (rev - cost) - float(total_expenses)
 
     return {
-        "best_sellers": [], "low_stock": [],
+        "best_sellers": [], 
+        "low_stock": [],
         "financials": {
             "total_revenue_usd": round(rev, 2),
             "total_cost_usd": round(cost, 2),
