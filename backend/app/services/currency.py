@@ -6,49 +6,67 @@ from datetime import datetime
 class CurrencyService:
     @staticmethod
     async def fetch_bcv_rates():
-        """Obtiene tasas reales del BCV. Si el Euro viene mal, lo corrige con el factor oficial."""
+        """
+        Obtiene las tasas oficiales (USD/EUR) directamente del espejo 
+        más rápido del BCV (PyDolarVE). Actualizado cada 5 min.
+        """
         url = "https://pydolarve.org/api/v1/dollar?page=bcv"
+        
         try:
             async with httpx.AsyncClient(timeout=25.0) as client:
+                print(">>> [SINCRO] Accediendo a PyDolarVE (Espejo Directo BCV)...")
                 response = await client.get(url)
+                
                 if response.status_code == 200:
                     data = response.json()
-                    usd = float(data['monitors']['usd']['price'])
-                    eur = float(data['monitors']['eur']['price'])
                     
-                    # CORRECCIÓN DE ARQUITECTO:
-                    # El BCV mantiene un ratio USD/EUR de aprox 1.1639. 
-                    # Si la API devuelve un Euro menor a USD * 1.12, es que está usando el ratio internacional.
-                    # En ese caso, forzamos el cálculo oficial de Venezuela.
-                    if eur < (usd * 1.12):
-                        eur = usd * 1.1639
+                    # Extraemos los valores de los monitores específicos
+                    # price de 'usd' y price de 'eur'
+                    usd_val = float(data['monitors']['usd']['price'])
+                    eur_val = float(data['monitors']['eur']['price'])
                     
-                    print(f"✅ TASAS CAPTURADAS: USD {usd} | EUR {eur}")
-                    return {"USD": usd, "EUR": eur}
+                    print(f"✅ TASAS REALES ENCONTRADAS: USD {usd_val} | EUR {eur_val}")
+                    return {"USD": usd_val, "EUR": eur_val}
+                
+                print(f"❌ Error de servidor externo: Status {response.status_code}")
                 return None
         except Exception as e:
-            print(f"Error Scraper: {e}")
+            print(f"❌ Error crítico de conexión: {e}")
             return None
 
     @staticmethod
     async def sync_rates_db(db: Session):
+        """Limpia la base de datos y guarda los valores que rigen hoy."""
         rates = await CurrencyService.fetch_bcv_rates()
-        if not rates: return None
+        
+        if not rates:
+            return None
+
         try:
+            # Borramos registros viejos para que el sistema NO lea el 569.76
             db.query(ExchangeRate).delete()
+            
             for curr, val in rates.items():
-                db.add(ExchangeRate(
-                    currency=curr, rate=val, source="BCV_REALTIME", updated_at=datetime.utcnow()
-                ))
+                new_rate = ExchangeRate(
+                    currency=curr, 
+                    rate=val, 
+                    source="BCV_REALTIME",
+                    updated_at=datetime.utcnow()
+                )
+                db.add(new_rate)
+            
             db.commit()
             return rates
         except Exception as e:
             db.rollback()
+            print(f"Error al guardar en Neon: {e}")
             return None
 
     @staticmethod
     def get_rate(db: Session, currency: str = "USD") -> float:
-        rate_obj = db.query(ExchangeRate).filter(ExchangeRate.currency == currency).order_by(ExchangeRate.updated_at.desc()).first()
-        if rate_obj: return float(rate_obj.rate)
-        # Valores del BCV hoy 1 de Mayo si la DB está vacía
-        return 489.55 if currency == "USD" else 569.76
+        """Extrae el valor más reciente de la DB. Si está vacía, devuelve 1.0."""
+        rate_obj = db.query(ExchangeRate).filter(
+            ExchangeRate.currency == currency
+        ).order_by(ExchangeRate.updated_at.desc()).first()
+        
+        return float(rate_obj.rate) if rate_obj else 1.0
