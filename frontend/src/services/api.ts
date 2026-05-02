@@ -10,8 +10,12 @@ const getCookie = (name: string) => {
 
 // --- 2. CONFIGURACIÓN DE LA INSTANCIA ---
 const api = axios.create({
-  // En producción (Render), usará la variable de entorno NEXT_PUBLIC_API_URL
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1', 
+  /**
+   * ARQUITECTURA DE PRODUCCIÓN:
+   * Intentamos usar la variable de entorno, pero si falla, 
+   * apuntamos DIRECTAMENTE a tu servidor de Render.
+   */
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://jgystore.onrender.com/api/v1', 
 });
 
 // --- 3. EL INTERCEPTOR (EL PASAPORTE) ---
@@ -66,42 +70,32 @@ export const registerSale = async (saleData: any) => {
   return response.data;
 };
 
-// --- 8. FINANZAS (NUEVO - REQUERIMIENTO JGYSTORE 2.0) ---
+// --- 8. FINANZAS ---
 export const getTransactions = async () => {
   const response = await api.get('/finance/');
   return response.data;
 };
 
-export const createTransaction = async (data: {
-  type: string;
-  category: string;
-  amount_usd: number;
-  description: string;
-}) => {
+export const createTransaction = async (data: any) => {
   const response = await api.post('/finance/', data);
   return response.data;
 };
 
-// Función extra para el balance total si decides usarla en el Dashboard
 export const getFinanceSummary = async () => {
   const response = await api.get('/finance/summary');
   return response.data;
 };
 
-export default api;
+export const deleteFinance = (id: number) => api.delete(`/finance/${id}`);
+export const updateFinance = (id: number, data: any) => api.put(`/finance/${id}`, data);
 
-// --- 9. ENCARGOS (PEDIDOS BAJO MANDATO) ---
+// --- 9. ENCARGOS ---
 export const getOrders = async () => {
   const response = await api.get('/orders/');
   return response.data;
 };
 
-export const createOrder = async (orderData: {
-  customer_name: string;
-  product_details: string;
-  amount_usd: number;
-  deposit_usd: number;
-}) => {
+export const createOrder = async (orderData: any) => {
   const response = await api.post('/orders/', orderData);
   return response.data;
 };
@@ -114,11 +108,13 @@ export const updateOrderStatus = async (orderId: number, status: string) => {
 export const deleteOrder = async (id: number) => {
   await api.delete(`/orders/${id}`);
 };
+
 export const updateOrder = async (id: number, data: any) => {
   const response = await api.put(`/orders/${id}`, data);
   return response.data;
 };
 
+// --- 10. CLIENTES ---
 export const getCustomers = async () => {
   const response = await api.get('/customers/');
   return response.data;
@@ -129,8 +125,8 @@ export const createCustomer = async (data: any) => {
   return response.data;
 };
 
-export const deleteFinance = (id: number) => api.delete(`/finance/${id}`);
-export const updateFinance = (id: number, data: any) => api.put(`/finance/${id}`, data);
-
 export const deleteCustomer = (id: number) => api.delete(`/customers/${id}`);
 export const updateCustomer = (id: number, data: any) => api.put(`/customers/${id}`, data);
+
+// Exportación única al final del archivo
+export default api;
