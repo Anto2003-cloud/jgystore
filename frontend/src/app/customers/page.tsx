@@ -31,11 +31,11 @@ export default function CustomersPage() {
     try {
       // PREPARAMOS EL ENVÍO: Enviamos los datos tal cual los escribes
       const payload = {
-        full_name: form.full_name,
-        phone: form.phone,
-        email: form.email || null
-      };
-
+  full_name: form.full_name.trim(),
+  phone: form.phone.trim(),
+  // Si el campo está vacío, enviamos null, no ""
+  email: form.email.trim() === "" ? null : form.email.trim() 
+};
       if (editingId) {
         await updateCustomer(editingId, payload);
         alert("✅ Cliente actualizado");
