@@ -13,14 +13,20 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Jgystore API")
 
-# ESTO ES LO QUE PERMITE QUE VERCEL VEA LOS DATOS
+# --- CONFIGURACIÓN DE CORS CORREGIDA ---
+origins = [
+    "https://jgystore.vercel.app",  # Tu dominio de producción
+    "http://localhost:3000",        # Por si pruebas localmente
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Permitir todo para que no falle el acceso
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# ---------------------------------------
 
 # Rutas
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
