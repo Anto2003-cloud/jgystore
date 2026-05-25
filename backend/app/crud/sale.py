@@ -1,13 +1,14 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
-from app.models import Sale, SaleItem, ProductVariation, Product
+from app.models.models import Sale, SaleItem, ProductVariation, Product
 from app.schemas.sale import SaleCreate
 from app.services.currency import CurrencyService
 from app.services.pricing import PricingService
 
 def create_sale(db: Session, sale_in: SaleCreate):
     # 1. Obtener la tasa actual para el registro histórico
-    current_rate = CurrencyService.get_latest_rate(db)
+    # CORRECCIÓN: Se cambió get_latest_rate por get_rate
+    current_rate = CurrencyService.get_rate(db)
     
     total_usd = 0.0
     total_bs = 0.0
