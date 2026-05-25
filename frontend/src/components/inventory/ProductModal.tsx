@@ -11,14 +11,14 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
     name: "",
     category: "Futbol",
     description: "",
-    base_cost_usd: 0,
-    freight_cost_usd: 0,
+    base_cost_usd: "0", // Ahora lo manejamos como string para los decimales
+    freight_cost_usd: "0",
     target_margin: 0.35,
   };
 
   const [baseData, setBaseData] = useState(initialState);
   const [variations, setVariations] = useState([
-    { size: "S", version: "FAN", stock: 0, min_stock_alert: 2 }
+    { size: "S", version: "FAN", stock: "0", min_stock_alert: 2 }
   ]);
 
   useEffect(() => {
@@ -28,86 +28,85 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
           name: editingProduct.name,
           category: editingProduct.category || "Futbol",
           description: editingProduct.description || "",
-          base_cost_usd: editingProduct.base_cost_usd,
-          freight_cost_usd: editingProduct.freight_cost_usd,
+          base_cost_usd: String(editingProduct.base_cost_usd),
+          freight_cost_usd: String(editingProduct.freight_cost_usd),
           target_margin: editingProduct.target_margin || 0.35,
         });
-        setVariations(editingProduct.variations || []);
+        setVariations(editingProduct.variations.map((v: any) => ({...v, stock: String(v.stock)})) || []);
       } else {
         setBaseData(initialState);
-        setVariations([{ size: "S", version: "FAN", stock: 0, min_stock_alert: 2 }]);
+        setVariations([{ size: "S", version: "FAN", stock: "0", min_stock_alert: 2 }]);
       }
     }
   }, [isOpen, editingProduct]);
 
   if (!isOpen) return null;
 
-  // LÓGICA PARA PERMITIR BORRAR EL CERO Y ESCRIBIR LIBREMENTE
+  // LÓGICA CORREGIDA PARA PERMITIR DECIMALES (PUNTO Y COMA)
   const handleNumericInput = (field: string, value: string, index?: number) => {
-    // Permitir solo números y un punto decimal
-    if (value !== "" && !/^\d*\.?\d*$/.test(value)) return;
+    // Reemplazamos coma por punto por si el usuario usa el teclado numérico con coma
+    const cleanValue = value.replace(',', '.');
 
-    const numericValue = value === "" ? 0 : parseFloat(value);
+    // Permitir: vacío, solo números, o números con un solo punto decimal
+    if (cleanValue !== "" && !/^\d*\.?\d*$/.test(cleanValue)) return;
 
     if (index !== undefined) {
-      // Es una variación (Stock)
       const newVars = [...variations];
-      newVars[index] = { ...newVars[index], [field]: numericValue };
+      // @ts-ignore
+      newVars[index][field] = cleanValue;
       setVariations(newVars);
     } else {
-      // Es un campo base (Costo/Flete)
-      setBaseData({ ...baseData, [field]: numericValue });
+      setBaseData({ ...baseData, [field]: cleanValue });
     }
   };
 
+  // Los cálculos siguen funcionando porque Number() entiende los strings
   const totalCost = Number(baseData.base_cost_usd) + Number(baseData.freight_cost_usd);
   const predictedPriceUsd = totalCost / (1 - baseData.target_margin);
 
   const addVariation = () => {
-    setVariations([...variations, { size: "M", version: "FAN", stock: 0, min_stock_alert: 2 }]);
+    setVariations([...variations, { size: "M", version: "FAN", stock: "0", min_stock_alert: 2 }]);
   };
 
   const removeVariation = (index: number) => {
     setVariations(variations.filter((_, i) => i !== index));
   };
 
- const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  try {
-    const payload = {
-      name: baseData.name,
-      category: baseData.category,
-      description: baseData.description || "",
-      base_cost_usd: Number(baseData.base_cost_usd),
-      freight_cost_usd: Number(baseData.freight_cost_usd),
-      target_margin: Number(baseData.target_margin),
-      is_active: true,
-      variations: variations.map(v => ({
-        size: String(v.size),
-        version: String(v.version).toUpperCase(), 
-        stock: Number(v.stock),
-        min_stock_alert: Number(v.min_stock_alert || 2)
-      }))
-    };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        name: baseData.name,
+        category: baseData.category,
+        description: baseData.description || "",
+        base_cost_usd: Number(baseData.base_cost_usd),
+        freight_cost_usd: Number(baseData.freight_cost_usd),
+        target_margin: Number(baseData.target_margin),
+        is_active: true,
+        variations: variations.map(v => ({
+          size: String(v.size),
+          version: String(v.version).toUpperCase(), 
+          stock: Number(v.stock),
+          min_stock_alert: Number(v.min_stock_alert || 2)
+        }))
+      };
 
-    if (editingProduct) {
-      await updateProduct(editingProduct.id, payload);
-    } else {
-      await createProduct(payload);
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, payload);
+      } else {
+        await createProduct(payload);
+      }
+      
+      onRefresh();
+      onClose();
+      alert("¡Producto guardado exitosamente!");
+    } catch (error: any) {
+      const serverMsg = error.response?.data?.detail || "Sin respuesta del servidor";
+      const finalMsg = typeof serverMsg === 'object' ? JSON.stringify(serverMsg) : serverMsg;
+      alert("EL SERVIDOR DIJO: " + finalMsg);
     }
-    
-    onRefresh();
-    onClose();
-    alert("¡Producto guardado exitosamente!");
-  // Dentro del catch de handleSubmit en ProductModal.tsx
-} catch (error: any) {
-  const serverMsg = error.response?.data?.detail || "Sin respuesta del servidor";
-  const finalMsg = typeof serverMsg === 'object' ? JSON.stringify(serverMsg) : serverMsg;
-  
-  console.error("ERROR CRÍTICO:", error.response);
-  alert("EL SERVIDOR DIJO: " + finalMsg);
-}
-};
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 text-slate-900">
       <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
@@ -144,8 +143,9 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
                   <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Costo Prenda ($)</label>
                   <input 
                     required type="text"
+                    inputMode="decimal"
                     className="w-full p-3 rounded-xl border border-slate-200 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-blue-500" 
-                    value={baseData.base_cost_usd === 0 ? "" : baseData.base_cost_usd} 
+                    value={baseData.base_cost_usd === "0" ? "" : baseData.base_cost_usd} 
                     onChange={e => handleNumericInput("base_cost_usd", e.target.value)}
                     placeholder="0.00"
                   />
@@ -154,14 +154,16 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
                   <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Costo Flete ($)</label>
                   <input 
                     required type="text"
+                    inputMode="decimal"
                     className="w-full p-3 rounded-xl border border-slate-200 bg-white text-slate-900 outline-none focus:ring-2 focus:ring-blue-500" 
-                    value={baseData.freight_cost_usd === 0 ? "" : baseData.freight_cost_usd} 
+                    value={baseData.freight_cost_usd === "0" ? "" : baseData.freight_cost_usd} 
                     onChange={e => handleNumericInput("freight_cost_usd", e.target.value)} 
                     placeholder="0.00"
                   />
                 </div>
               </div>
 
+              {/* Sección de Precio Sugerido */}
               <div className="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl">
                 <p className="text-emerald-800 text-[10px] font-black uppercase tracking-[0.1em] mb-2">Precio de Venta Sugerido</p>
                 <div className="flex justify-between items-center">
@@ -177,6 +179,7 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
               </div>
             </div>
 
+            {/* Columna de Variaciones */}
             <div className="space-y-6">
               <div className="flex justify-between items-center border-b pb-2">
                 <h3 className="text-lg font-semibold text-blue-600">Stock por Tallas</h3>
@@ -221,7 +224,7 @@ export const ProductModal = ({ isOpen, onClose, onRefresh, editingProduct }: any
                       <input 
                         type="text"
                         className="w-full p-2 bg-white border border-slate-200 rounded-xl text-sm font-black text-center text-blue-600 outline-none" 
-                        value={v.stock === 0 ? "" : v.stock}
+                        value={v.stock === "0" ? "" : v.stock}
                         onChange={e => handleNumericInput("stock", e.target.value, index)}
                         placeholder="0"
                       />
