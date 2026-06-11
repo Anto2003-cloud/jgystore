@@ -122,7 +122,7 @@ export default function LoginPage() {
             Antonio Pérez & Alejandro Pérez
           </p>
           <p className="text-slate-300 text-[9px] uppercase tracking-tighter font-medium">
-            Tesis Ingeniería Informática • 2026
+            Trabajo De Grado  Ingeniería Informática • 2026
           </p>
         </div>
       </div>
